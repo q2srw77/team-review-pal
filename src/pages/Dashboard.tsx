@@ -26,7 +26,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 };
 
 export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?: () => void }) {
-  const { user, signOut, isReviewer, isAdmin, profileName } = useAuth();
+  const { user, signOut, isAdmin, roles, profileName } = useAuth();
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -63,7 +63,9 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
               <ClipboardCheck className="w-5 h-5 text-primary-foreground" />
             </div>
             <h1 className="text-lg font-bold tracking-tight text-foreground">Project Reviews</h1>
-            {isReviewer && <Badge variant="outline" className="text-xs border-accent text-accent">Reviewer</Badge>}
+            {roles.map(role => (
+              <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">{role}</Badge>
+            ))}
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">{profileName}</span>
