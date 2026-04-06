@@ -243,6 +243,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                     <tr key={u.user_id} className="border-b border-border/60 last:border-0 hover:bg-secondary/30 transition-colors">
                       <td className="py-3 px-4">
                         <div className="font-medium text-foreground">{u.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{u.email}</div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
