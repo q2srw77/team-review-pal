@@ -143,8 +143,8 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Platform</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Team</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Submitted</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Complete By</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Date</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -167,15 +167,15 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                         </Badge>
                       </td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
+                        {format(new Date(r.created_at), "MMM d, yyyy")}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
                         {r.complete_by ? (
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3.5 h-3.5" />
                             {format(new Date(r.complete_by), "MMM d, yyyy")}
                           </span>
                         ) : "—"}
-                      </td>
-                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
-                        {format(new Date(r.created_at), "MMM d, yyyy")}
                       </td>
                     </tr>
                   ))}
