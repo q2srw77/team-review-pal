@@ -1,31 +1,19 @@
 
 
-## Allow Submitter to Edit Review Request
+## Add Reviewer Progress Indicator to Dashboard Table
 
 ### Overview
-Add an "Edit" mode to the RequestDetail sheet so the original submitter can modify their review request fields (title, platform, URL, notes, complete-by date). Team is excluded from editing since changing it would require re-creating reviewer statuses.
+Add a "Progress" column to the dashboard table showing a fraction (e.g., "2/4") with a small progress bar for each review request.
 
-### Changes to `src/components/RequestDetail.tsx`
+### Changes to `src/pages/Dashboard.tsx`
 
-1. **Add editing state**: `editing` boolean, plus local state for editable fields (`editTitle`, `editPlatform`, `editUrl`, `editNotes`, `editCompleteBy`)
-2. **Load platforms list**: Fetch from `platforms` table when entering edit mode (for the platform dropdown)
-3. **Toggle edit mode**: Show an "Edit" button in the sheet header when `user.id === request.submitted_by` and request is not completed
-4. **Edit UI**: When `editing` is true, replace the read-only metadata fields with editable inputs:
-   - Title: Input field
-   - Platform: Select dropdown
-   - URL: Input field
-   - Notes: Textarea
-   - Complete By: Calendar date picker (same pattern as RequestForm)
-   - Team: shown as read-only (not editable)
-5. **Save handler**: Update `review_requests` with the edited fields via Supabase, call `onUpdated()`, exit edit mode
-6. **Cancel**: Reset local state to original request values, exit edit mode
+1. **Fetch reviewer progress data**: After fetching requests, batch-query `review_statuses` for all request IDs. Group by `request_id` to compute `completed` count and `total` count per request. Store in a `Map<string, {completed: number, total: number}>`.
 
-### No database changes needed
-The existing RLS policy "Submitters can update own requests" already allows `auth.uid() = submitted_by` to update their own rows.
+2. **Add "Progress" column**: Insert a new table header between "Status" and "Submitted". Each cell shows:
+   - Text fraction: `2/4`
+   - A small `Progress` bar component (already exists in `src/components/ui/progress.tsx`) underneath, colored by completion percentage
 
-### Files to modify
+3. **Import** the `Progress` component from `@/components/ui/progress`
 
-| File | Change |
-|------|--------|
-| `src/components/RequestDetail.tsx` | Add edit mode with inline form fields for submitter |
+### Single file change: `src/pages/Dashboard.tsx`
 
