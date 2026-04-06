@@ -164,6 +164,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Platform</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Team</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden sm:table-cell">Progress</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Submitted</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Complete By</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground w-10"></th>
