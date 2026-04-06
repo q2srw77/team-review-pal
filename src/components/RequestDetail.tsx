@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Send, Clock, User, Users, Calendar } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar, CheckCircle2, Circle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
@@ -22,6 +22,13 @@ interface Note {
   author_name: string;
 }
 
+interface ReviewerStatus {
+  id: string;
+  reviewer_id: string;
+  reviewer_name: string;
+  status: string;
+}
+
 const STATUS_STYLES: Record<RequestStatus, string> = {
   pending: "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.3)]",
   in_review: "bg-[hsl(var(--status-in-review)/0.15)] text-[hsl(var(--status-in-review))] border-[hsl(var(--status-in-review)/0.3)]",
@@ -32,6 +39,12 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   pending: "Pending",
   in_review: "In Review",
   completed: "Completed",
+};
+
+const REVIEWER_STATUS_ICON: Record<string, typeof Circle> = {
+  pending: Circle,
+  in_review: Loader2,
+  completed: CheckCircle2,
 };
 
 export default function RequestDetail({
@@ -52,12 +65,14 @@ export default function RequestDetail({
   const [submitting, setSubmitting] = useState(false);
   const [submitterName, setSubmitterName] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [reviewerStatuses, setReviewerStatuses] = useState<ReviewerStatus[]>([]);
 
   useEffect(() => {
     if (!request || !open) return;
     fetchNotes();
     fetchSubmitter();
     fetchTeam();
+    fetchReviewerStatuses();
   }, [request, open]);
 
   const fetchSubmitter = async () => {
@@ -81,6 +96,36 @@ export default function RequestDetail({
       .eq("id", request.team_id)
       .single();
     setTeamName(data?.name ?? "Unknown");
+  };
+
+  const fetchReviewerStatuses = async () => {
+    if (!request) return;
+    const { data } = await supabase
+      .from("review_statuses")
+      .select("id, reviewer_id, status")
+      .eq("request_id", request.id);
+
+    if (!data || data.length === 0) {
+      setReviewerStatuses([]);
+      return;
+    }
+
+    const reviewerIds = data.map((r) => r.reviewer_id);
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", reviewerIds);
+
+    const nameMap = new Map(profiles?.map((p) => [p.user_id, p.full_name]) ?? []);
+
+    setReviewerStatuses(
+      data.map((r) => ({
+        id: r.id,
+        reviewer_id: r.reviewer_id,
+        reviewer_name: nameMap.get(r.reviewer_id) ?? "Unknown",
+        status: r.status,
+      }))
+    );
   };
 
   const fetchNotes = async () => {
@@ -128,20 +173,24 @@ export default function RequestDetail({
     }
   };
 
-  const updateStatus = async (status: RequestStatus) => {
-    if (!request) return;
+  const updateMyReviewStatus = async (newStatus: string) => {
+    if (!request || !user) return;
     const { error } = await supabase
-      .from("review_requests")
-      .update({ status })
-      .eq("id", request.id);
+      .from("review_statuses")
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq("request_id", request.id)
+      .eq("reviewer_id", user.id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
+      fetchReviewerStatuses();
       onUpdated();
     }
   };
 
   if (!request) return null;
+
+  const myReviewStatus = reviewerStatuses.find((r) => r.reviewer_id === user?.id);
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -158,23 +207,10 @@ export default function RequestDetail({
               <Badge variant="secondary">{request.platform}</Badge>
             </div>
             <div>
-              <span className="text-muted-foreground block mb-1">Status</span>
-              {isReviewer ? (
-                <Select value={request.status} onValueChange={(v) => updateStatus(v as RequestStatus)}>
-                  <SelectTrigger className="h-8 w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="in_review">In Review</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge className={STATUS_STYLES[request.status]} variant="outline">
-                  {STATUS_LABELS[request.status]}
-                </Badge>
-              )}
+              <span className="text-muted-foreground block mb-1">Overall Status</span>
+              <Badge className={STATUS_STYLES[request.status]} variant="outline">
+                {STATUS_LABELS[request.status]}
+              </Badge>
             </div>
             <div>
               <span className="text-muted-foreground block mb-1">Team</span>
@@ -195,7 +231,7 @@ export default function RequestDetail({
               <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{submitterName}</span>
             </div>
             <div>
-              <span className="text-muted-foreground block mb-1">Date</span>
+              <span className="text-muted-foreground block mb-1">Submitted</span>
               <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{format(new Date(request.created_at), "MMM d, yyyy")}</span>
             </div>
           </div>
@@ -215,6 +251,53 @@ export default function RequestDetail({
             <div>
               <span className="text-muted-foreground text-sm block mb-1">Notes</span>
               <p className="text-sm bg-secondary/50 rounded-lg p-3">{request.notes}</p>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Reviewer Progress */}
+          {reviewerStatuses.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-sm mb-3">Reviewer Progress</h3>
+              <div className="space-y-2">
+                {reviewerStatuses.map((rs) => {
+                  const Icon = REVIEWER_STATUS_ICON[rs.status] ?? Circle;
+                  const isMe = rs.reviewer_id === user?.id;
+                  return (
+                    <div key={rs.id} className="flex items-center justify-between bg-secondary/40 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Icon className={`w-4 h-4 ${
+                          rs.status === "completed" ? "text-[hsl(var(--status-completed))]" :
+                          rs.status === "in_review" ? "text-[hsl(var(--status-in-review))]" :
+                          "text-muted-foreground"
+                        }`} />
+                        <span className="text-sm font-medium">{rs.reviewer_name}{isMe ? " (You)" : ""}</span>
+                      </div>
+                      {isMe && isReviewer ? (
+                        <Select value={rs.status} onValueChange={updateMyReviewStatus}>
+                          <SelectTrigger className="h-7 w-32 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="in_review">In Review</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge variant="outline" className={`text-xs ${
+                          rs.status === "completed" ? STATUS_STYLES.completed :
+                          rs.status === "in_review" ? STATUS_STYLES.in_review :
+                          STATUS_STYLES.pending
+                        }`}>
+                          {STATUS_LABELS[rs.status as RequestStatus] ?? rs.status}
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
