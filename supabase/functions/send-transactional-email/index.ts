@@ -30,14 +30,30 @@ function generateToken(): string {
     .join('')
 }
 
-// Auth note: this function uses verify_jwt = true in config.toml, so Supabase's
-// gateway validates the caller's JWT (anon or service_role) before the request
-// reaches this code. No in-function auth check is needed.
+// Auth: verify_jwt = false in config.toml; JWT validated in code below.
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
+  }
+
+  // Validate caller JWT
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const tmpClient = createClient(Deno.env.get('SUPABASE_URL')!, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  })
+  const { error: claimsErr } = await tmpClient.auth.getClaims(authHeader.replace('Bearer ', ''))
+  if (claimsErr) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
