@@ -50,7 +50,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
       id: requestId,
       title: title.trim(),
       platform: platform,
-      url_location: urlLocation.trim() || null,
+      url_location: urlLocation.trim(),
       notes: notes.trim(),
       submitted_by: user.id,
       team_id: teamId || null,
