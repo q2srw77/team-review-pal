@@ -22,8 +22,11 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
   const [platform, setPlatform] = useState("");
   const [urlLocation, setUrlLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [completeBy, setCompleteBy] = useState<Date | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     supabase.from("platforms").select("id, name").order("name").then(({ data }) => {
