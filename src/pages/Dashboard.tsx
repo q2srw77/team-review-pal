@@ -81,7 +81,14 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
       );
     }
 
-    setRequests((data ?? []).filter((r) => r.status !== "archived"));
+    const filtered = (data ?? []).filter((r) => r.status !== "archived");
+    filtered.sort((a, b) => {
+      if (!a.complete_by && !b.complete_by) return 0;
+      if (!a.complete_by) return 1;
+      if (!b.complete_by) return -1;
+      return new Date(a.complete_by).getTime() - new Date(b.complete_by).getTime();
+    });
+    setRequests(filtered);
     if (selected) {
       const updated = data?.find((r) => r.id === selected.id);
       if (updated) setSelected(updated);
