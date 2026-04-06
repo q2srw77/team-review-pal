@@ -58,14 +58,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (user_id === caller.id) {
-      return new Response(JSON.stringify({ error: "Cannot modify your own account" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     if (action === "update_roles") {
+      if (user_id === caller.id) {
+        return new Response(JSON.stringify({ error: "Cannot modify your own roles" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { roles } = body;
       const validRoles = ["admin", "reviewer", "submitter"];
       if (!roles || !Array.isArray(roles) || roles.length === 0) {
@@ -147,6 +146,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === "delete_user") {
+      if (user_id === caller.id) {
+        return new Response(JSON.stringify({ error: "Cannot delete your own account" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       await supabase.from("user_roles").delete().eq("user_id", user_id);
       const { error } = await supabase.auth.admin.deleteUser(user_id);
       if (error) {

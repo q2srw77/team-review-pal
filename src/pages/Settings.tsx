@@ -295,26 +295,28 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                         {format(new Date(u.created_at), "MMM d, yyyy")}
                       </td>
                       <td className="py-3 px-4">
-                        {u.user_id !== user?.id && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => { setEditTarget(u); setEditForm({ full_name: u.full_name, email: u.email, password: "" }); }}>
-                                Edit User
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setRoleChangeTarget(u); setNewRoles(u.roles); }}>
-                                Change Roles
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(u)}>
-                                Remove User
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { setEditTarget(u); setEditForm({ full_name: u.full_name, email: u.email, password: "" }); }}>
+                              Edit User
+                            </DropdownMenuItem>
+                            {u.user_id !== user?.id && (
+                              <>
+                                <DropdownMenuItem onClick={() => { setRoleChangeTarget(u); setNewRoles(u.roles); }}>
+                                  Change Roles
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(u)}>
+                                  Remove User
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}
