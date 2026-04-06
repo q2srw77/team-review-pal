@@ -521,16 +521,22 @@ export default function RequestDetail({
           {/* Download Report */}
           {request.report_pdf_path && (
             <div>
-              <a
-                href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/review-reports/${request.report_pdf_path}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={async () => {
+                  const { data } = await supabase.storage
+                    .from("review-reports")
+                    .createSignedUrl(request.report_pdf_path!, 3600);
+                  if (data?.signedUrl) {
+                    window.open(data.signedUrl, "_blank");
+                  }
+                }}
               >
-                <Button variant="outline" size="sm" className="w-full">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Review Report (PDF)
-                </Button>
-              </a>
+                <Download className="w-4 h-4 mr-2" />
+                Download Review Report (PDF)
+              </Button>
             </div>
           )}
 

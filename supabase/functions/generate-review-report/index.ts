@@ -267,10 +267,10 @@ Deno.serve(async (req) => {
       .update({ report_pdf_path: fileName })
       .eq('id', request_id)
 
-    // Get public URL for the PDF
-    const { data: urlData } = supabase.storage
+    // Get signed URL for the PDF (1 hour expiry)
+    const { data: urlData } = await supabase.storage
       .from('review-reports')
-      .getPublicUrl(fileName)
+      .createSignedUrl(fileName, 3600)
 
     // Send email to submitter
     if (submitter?.email) {
@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
             title: request.title,
             platform: request.platform,
             teamName,
-            downloadUrl: urlData.publicUrl,
+            downloadUrl: urlData?.signedUrl ?? '',
           },
         },
       })
