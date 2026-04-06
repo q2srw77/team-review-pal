@@ -62,7 +62,7 @@ export default function RequestDetail({
   onClose: () => void;
   onUpdated: () => void;
 }) {
-  const { isReviewer, user } = useAuth();
+  const { isReviewer, isAdmin, user } = useAuth();
   const { toast } = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
