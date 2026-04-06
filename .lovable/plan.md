@@ -1,11 +1,15 @@
 
 
-## Rename "Project Reviews" to "Review Hub"
+## Fix URL Field Error When Left Empty
 
-Two text replacements needed:
+### Problem
+The `url_location` column in `review_requests` is defined as `TEXT NOT NULL DEFAULT ''`. When the URL field is left empty, the form explicitly sends `null` (line 53: `urlLocation.trim() || null`), which violates the NOT NULL constraint and causes a database error.
 
-1. **`src/pages/Login.tsx` line 36** — Change `"Project Reviews"` to `"Review Hub"` in the login card title.
-2. **`src/pages/Dashboard.tsx` line 139** — Change `"Project Reviews"` to `"Review Hub"` in the dashboard header.
+### Fix
+**`src/components/RequestForm.tsx` line 53** — Change `urlLocation.trim() || null` to `urlLocation.trim()` so it sends an empty string instead of null, which the database accepts via its DEFAULT.
 
-No other files affected.
+### Single line change, single file
+| File | Change |
+|------|--------|
+| `src/components/RequestForm.tsx` | `url_location: urlLocation.trim()` instead of `urlLocation.trim() \|\| null` |
 
