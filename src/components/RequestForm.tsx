@@ -32,9 +32,12 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
     supabase.from("platforms").select("id, name").order("name").then(({ data }) => {
       if (data) setPlatforms(data);
     });
+    supabase.from("teams").select("id, name").order("name").then(({ data }) => {
+      if (data) setTeams(data);
+    });
   }, [open]);
 
-  const reset = () => { setTitle(""); setPlatform(""); setUrlLocation(""); setNotes(""); };
+  const reset = () => { setTitle(""); setPlatform(""); setUrlLocation(""); setNotes(""); setTeamId(""); setCompleteBy(undefined); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
