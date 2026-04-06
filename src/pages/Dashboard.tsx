@@ -189,6 +189,19 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                           {STATUS_LABELS[r.status]}
                         </Badge>
                       </td>
+                      <td className="py-3 px-4 hidden sm:table-cell">
+                        {(() => {
+                          const p = progressMap.get(r.id);
+                          if (!p || p.total === 0) return <span className="text-muted-foreground text-xs">—</span>;
+                          const pct = Math.round((p.completed / p.total) * 100);
+                          return (
+                            <div className="flex items-center gap-2 min-w-[80px]">
+                              <span className="text-xs font-medium text-foreground whitespace-nowrap">{p.completed}/{p.total}</span>
+                              <Progress value={pct} className="h-2 flex-1" />
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
                         {format(new Date(r.created_at), "MMM d, yyyy")}
                       </td>
