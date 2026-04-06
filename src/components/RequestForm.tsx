@@ -98,6 +98,20 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
     } catch (emailErr) {
       console.error("Failed to send notifications:", emailErr);
     }
+    // Log audit entry
+    try {
+      const { data: profile } = await supabase.from("profiles").select("full_name").eq("user_id", user.id).maybeSingle();
+      await supabase.from("audit_logs").insert({
+        user_id: user.id,
+        user_name: profile?.full_name || user.email || "",
+        action: "created",
+        entity_type: "review_request",
+        entity_id: requestId,
+        details: { title: title.trim(), platform, team_id: teamId },
+      });
+    } catch (e) {
+      console.error("Failed to write audit log:", e);
+    }
     setSubmitting(false);
     toast({ title: "Request submitted" });
     reset();
