@@ -30,8 +30,9 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 
 export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?: () => void }) {
   const { user, signOut, isAdmin, roles, profileName } = useAuth();
-  const [requests, setRequests] = useState<ReviewRequest[]>([]);
+  const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
+  const [view, setView] = useState<"active" | "archived">("active");
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
