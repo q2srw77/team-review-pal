@@ -186,7 +186,14 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                       onClick={() => openDetail(r)}
                       className="border-b border-border/60 last:border-0 hover:bg-secondary/30 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-4 font-medium text-foreground">{r.title}</td>
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          {r.title}
+                          {r.complete_by && differenceInDays(new Date(r.complete_by), new Date()) <= 3 && r.status !== "completed" && (
+                            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
+                          )}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">
                         <Badge variant="secondary">{r.platform}</Badge>
                       </td>
