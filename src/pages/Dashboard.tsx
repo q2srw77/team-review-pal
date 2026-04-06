@@ -6,7 +6,7 @@ import RequestDetail from "@/components/RequestDetail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ClipboardCheck, LogOut, Settings, Calendar } from "lucide-react";
+import { ClipboardCheck, LogOut, Settings, Calendar, Download } from "lucide-react";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -145,7 +145,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Submitted</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Complete By</th>
-                  </tr>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground w-10"></th>
                 </thead>
                 <tbody>
                   {requests.map((r) => (
@@ -177,7 +177,19 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                           </span>
                         ) : "—"}
                       </td>
-                    </tr>
+                      <td className="py-3 px-4">
+                        {r.report_pdf_path && (
+                          <a
+                            href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/review-reports/${r.report_pdf_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            title="Download Report"
+                          >
+                            <Download className="w-4 h-4 text-primary hover:text-primary/80" />
+                          </a>
+                        )}
+                      </td>
                   ))}
                 </tbody>
               </table>
