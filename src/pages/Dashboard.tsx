@@ -84,6 +84,9 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
 
     const all = data ?? [];
     all.sort((a, b) => {
+      const aCompleted = a.status === "completed" ? 1 : 0;
+      const bCompleted = b.status === "completed" ? 1 : 0;
+      if (aCompleted !== bCompleted) return aCompleted - bCompleted;
       if (!a.complete_by && !b.complete_by) return 0;
       if (!a.complete_by) return 1;
       if (!b.complete_by) return -1;
