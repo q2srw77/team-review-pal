@@ -146,13 +146,14 @@ export default function RequestDetail({
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      // Audit log
+      // Audit log via edge function
       if (user) {
-        supabase.from("audit_logs").insert({
-          user_id: user.id, user_name: submitterName || user.email || "",
-          action: "updated", entity_type: "review_request", entity_id: request.id,
-          details: { title: editTitle.trim(), platform: editPlatform },
-        }).then(() => {});
+        supabase.functions.invoke("write-audit-log", {
+          body: {
+            action: "updated", entity_type: "review_request", entity_id: request.id,
+            details: { title: editTitle.trim(), platform: editPlatform },
+          },
+        }).catch(() => {});
       }
       toast({ title: "Updated", description: "Review request updated successfully." });
       setEditing(false);
@@ -172,11 +173,12 @@ export default function RequestDetail({
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       if (user) {
-        supabase.from("audit_logs").insert({
-          user_id: user.id, user_name: submitterName || user.email || "",
-          action: "archived", entity_type: "review_request", entity_id: request.id,
-          details: { title: request.title },
-        }).then(() => {});
+        supabase.functions.invoke("write-audit-log", {
+          body: {
+            action: "archived", entity_type: "review_request", entity_id: request.id,
+            details: { title: request.title },
+          },
+        }).catch(() => {});
       }
       toast({ title: "Archived", description: "Request has been archived." });
       onUpdated();
@@ -196,11 +198,12 @@ export default function RequestDetail({
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       if (user) {
-        supabase.from("audit_logs").insert({
-          user_id: user.id, user_name: submitterName || user.email || "",
-          action: "deleted", entity_type: "review_request", entity_id: request.id,
-          details: { title: request.title },
-        }).then(() => {});
+        supabase.functions.invoke("write-audit-log", {
+          body: {
+            action: "deleted", entity_type: "review_request", entity_id: request.id,
+            details: { title: request.title },
+          },
+        }).catch(() => {});
       }
       toast({ title: "Deleted", description: "Request has been permanently deleted." });
       onUpdated();
@@ -316,13 +319,14 @@ export default function RequestDetail({
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      // Audit log for status change
+      // Audit log for status change via edge function
       if (user) {
-        supabase.from("audit_logs").insert({
-          user_id: user.id, user_name: submitterName || user.email || "",
-          action: "review_status_changed", entity_type: "review_request", entity_id: request.id,
-          details: { new_status: newStatus, title: request.title },
-        }).then(() => {});
+        supabase.functions.invoke("write-audit-log", {
+          body: {
+            action: "review_status_changed", entity_type: "review_request", entity_id: request.id,
+            details: { new_status: newStatus, title: request.title },
+          },
+        }).catch(() => {});
       }
       fetchReviewerStatuses();
       onUpdated();
