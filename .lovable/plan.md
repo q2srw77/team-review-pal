@@ -1,17 +1,23 @@
 
 
-## Allow Admin Self-Editing
+## Admin Role Simplification
 
-### Current restriction
-- **Edge function** (`manage-user/index.ts` line ~67): blocks any action where `user_id === caller.id`
-- **UI** (`Settings.tsx`): hides the dropdown menu for the current user's row
+### What changes
 
-### Changes
+**Display**: When a user has the `admin` role, only show "Admin" as their badge — hide any other roles from display.
 
-**`supabase/functions/manage-user/index.ts`**
-- Move the self-edit guard so it only applies to `delete_user` and `update_roles`, not `update_user`
+**Access**: Make `isReviewer` true when the user is an admin, so admins automatically get reviewer capabilities (status changes, adding notes). Submit access is already available to all authenticated users, so no change needed there.
+
+### Files to modify
+
+**`src/hooks/useAuth.tsx`**
+- Change `setIsReviewer` logic: `setIsReviewer(roleList.includes("reviewer") || roleList.includes("admin"))`
+
+**`src/pages/Dashboard.tsx`**
+- Filter displayed roles: if `roles` includes `admin`, only show `["admin"]`; otherwise show all roles
 
 **`src/pages/Settings.tsx`**
-- Always show the dropdown for every row
-- For the current user's row, only show "Edit User" (hide "Change Roles" and "Remove User")
+- Same display logic for the roles column in the users table: if a user has `admin`, only show the Admin badge
+
+No database or edge function changes needed.
 
