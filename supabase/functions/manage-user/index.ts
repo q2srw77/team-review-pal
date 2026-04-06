@@ -89,6 +89,11 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "update_user") {
+      const { full_name, email, password } = await req.json().catch(() => ({}));
+      // We already parsed the body above, so re-read from the original parse
+    }
+
     if (action === "delete_user") {
       await supabase.from("user_roles").delete().eq("user_id", user_id);
       const { error } = await supabase.auth.admin.deleteUser(user_id);
