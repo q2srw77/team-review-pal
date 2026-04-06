@@ -49,6 +49,8 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
       url_location: urlLocation.trim(),
       notes: notes.trim(),
       submitted_by: user.id,
+      team_id: teamId || null,
+      complete_by: completeBy ? format(completeBy, "yyyy-MM-dd") : null,
     });
     setSubmitting(false);
     if (error) {
