@@ -1,40 +1,23 @@
 
 
-## Display All User Roles in Dashboard Header
+## Fix: Email not showing in Users section
 
-### Changes
+### Root cause
 
-**`src/hooks/useAuth.tsx`**
-- Add a `roles: AppRole[]` array to the auth context (derived from the `user_roles` query that already runs)
-- Export it alongside the existing `isReviewer`/`isAdmin` booleans
+The profile for "Steve Weber" has an empty `email` field (`"email":""`). This happened because the `handle_new_user` trigger (which populates `email` from `auth.users`) was added **after** the initial admin account was created via the setup flow. The setup-admin edge function didn't store email in the profiles table.
 
-**`src/pages/Dashboard.tsx`**
-- Import `roles` from `useAuth`
-- Replace the single `{isReviewer && <Badge>Reviewer</Badge>}` with a loop over all roles, rendering a badge for each
+### Fix (two parts)
 
-### Technical detail
+**1. Backfill existing profiles** (data fix)
+- Run an UPDATE via the insert tool to set profiles.email from auth.users for any profiles where email is currently empty. Since we can't query auth.users from the client, we'll use a migration with a `SECURITY DEFINER` function that copies `auth.users.email` into `profiles.email` for all rows where it's blank, then drops itself.
 
-In `useAuth`, the `fetchUserData` effect already queries `user_roles`. Instead of only deriving booleans, also store the raw role strings:
+**2. Update `setup-admin` edge function**
+- Check `supabase/functions/setup-admin/index.ts` -- if it manually inserts into profiles, ensure it includes the email field. (The trigger should handle new users going forward, but the setup-admin function may bypass the trigger by inserting directly.)
 
-```ts
-const roleList = roles?.map(r => r.role) ?? [];
-setUserRoles(roleList);
-setIsReviewer(roleList.includes("reviewer"));
-setIsAdmin(roleList.includes("admin"));
-```
+### Files to modify
 
-In Dashboard header, replace the single badge with:
-```tsx
-{roles.map(role => (
-  <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">
-    {role}
-  </Badge>
-))}
-```
-
-### Files modified
 | File | Change |
 |------|--------|
-| `src/hooks/useAuth.tsx` | Add `roles` array to context |
-| `src/pages/Dashboard.tsx` | Render all role badges |
+| New migration | Backfill empty emails from auth.users |
+| `supabase/functions/setup-admin/index.ts` | Ensure email is stored when creating the admin profile (if applicable) |
 
