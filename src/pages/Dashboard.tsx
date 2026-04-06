@@ -30,8 +30,9 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 
 export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?: () => void }) {
   const { user, signOut, isAdmin, roles, profileName } = useAuth();
-  const [requests, setRequests] = useState<ReviewRequest[]>([]);
+  const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
+  const [view, setView] = useState<"active" | "archived">("active");
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
@@ -81,14 +82,14 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
       );
     }
 
-    const filtered = (data ?? []).filter((r) => r.status !== "archived");
-    filtered.sort((a, b) => {
+    const all = data ?? [];
+    all.sort((a, b) => {
       if (!a.complete_by && !b.complete_by) return 0;
       if (!a.complete_by) return 1;
       if (!b.complete_by) return -1;
       return new Date(a.complete_by).getTime() - new Date(b.complete_by).getTime();
     });
-    setRequests(filtered);
+    setAllRequests(all);
     if (selected) {
       const updated = data?.find((r) => r.id === selected.id);
       if (updated) setSelected(updated);
@@ -123,6 +124,10 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
     setDetailOpen(true);
   };
 
+  const activeRequests = allRequests.filter((r) => r.status !== "archived");
+  const archivedRequests = allRequests.filter((r) => r.status === "archived");
+  const requests = view === "active" ? activeRequests : archivedRequests;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 bg-card border-b border-border">
@@ -152,9 +157,26 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Review Requests</h2>
-            <p className="text-sm text-muted-foreground mt-1">{requests.length} total requests</p>
+            <p className="text-sm text-muted-foreground mt-1">{requests.length} {view === "active" ? "active" : "archived"} requests</p>
           </div>
           <RequestForm onCreated={fetchRequests} />
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={view === "active" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("active")}
+          >
+            Active ({activeRequests.length})
+          </Button>
+          <Button
+            variant={view === "archived" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("archived")}
+          >
+            Archived ({archivedRequests.length})
+          </Button>
         </div>
 
         {requests.length === 0 ? (
