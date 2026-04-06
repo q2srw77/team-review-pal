@@ -63,7 +63,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
               <ClipboardCheck className="w-5 h-5 text-primary-foreground" />
             </div>
             <h1 className="text-lg font-bold tracking-tight text-foreground">Project Reviews</h1>
-            {roles.map(role => (
+            {(roles.includes("admin") ? ["admin"] : roles).map(role => (
               <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">{role}</Badge>
             ))}
           </div>
