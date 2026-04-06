@@ -1,30 +1,33 @@
 
 
-## Instant Notification When All Reviewers Complete
+## Fix: Reviewer Cannot Change Review Status
 
-### Overview
-Currently the submitter only receives an email after the PDF report finishes generating (which can take several seconds). This change sends an immediate notification email right when the last reviewer marks "completed", separate from the PDF email that follows later.
+### Root Cause
+The review request "MDR Overview" (submitted by Steve Weber) has **no rows in the `review_statuses` table**. This request was created before the `auto_populate_review_statuses` trigger was added to the database, so reviewer status rows were never generated.
 
-### Approach
-After a reviewer updates their status in `RequestDetail`, check if all reviewers are now complete. If so, immediately invoke `send-transactional-email` with a new `review-all-complete` template to notify the submitter. The existing PDF generation + `review-completed` email flow remains unchanged.
+Steve Cypher (the only non-submitter team member) should have a `review_statuses` row but doesn't, which means there's nothing to display or update in the Reviewer Progress section.
 
-### New Email Template
-Create `supabase/functions/_shared/transactional-email-templates/review-all-complete.tsx` -- a simple notification saying "All reviewers have completed their review for [title]" without a PDF link (since the PDF isn't ready yet). Mention the report will follow shortly.
+### Fix
 
-### Changes
+**Database migration** to backfill missing `review_statuses` for existing requests that have a `team_id` but no corresponding reviewer rows:
 
-**`supabase/functions/_shared/transactional-email-templates/review-all-complete.tsx`** (new)
-- Simple template: heading, request title, platform, team name, message that all reviewers are done and a PDF report will follow
+```sql
+INSERT INTO public.review_statuses (request_id, reviewer_id)
+SELECT rr.id, tm.user_id
+FROM public.review_requests rr
+JOIN public.team_members tm ON tm.team_id = rr.team_id
+WHERE tm.user_id != rr.submitted_by
+  AND rr.team_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM public.review_statuses rs
+    WHERE rs.request_id = rr.id AND rs.reviewer_id = tm.user_id
+  );
+```
 
-**`supabase/functions/_shared/transactional-email-templates/registry.ts`**
-- Register the new `review-all-complete` template
+This is a one-time data fix. No code changes needed -- the trigger already handles new requests correctly, and the UI already supports updating reviewer status.
 
-**`src/components/RequestDetail.tsx`**
-- In `updateMyReviewStatus`, after the successful status update:
-  1. Re-fetch reviewer statuses
-  2. Check if all statuses are now "completed"
-  3. If yes, fetch the submitter's email from `profiles` and invoke `send-transactional-email` with `templateName: 'review-all-complete'`
-
-### Redeploy
-Deploy `send-transactional-email` after template changes.
+### Files changed
+| File | Change |
+|------|--------|
+| New migration | Backfill missing `review_statuses` rows |
 
