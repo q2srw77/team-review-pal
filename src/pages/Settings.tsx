@@ -284,7 +284,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
-                          {u.roles.map((role) => (
+                          {(u.roles.includes("admin") ? ["admin"] as AppRole[] : u.roles).map((role) => (
                             <Badge key={role} variant="outline" className={ROLE_STYLES[role]}>
                               {role.charAt(0).toUpperCase() + role.slice(1)}
                             </Badge>
