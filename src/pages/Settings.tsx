@@ -68,6 +68,9 @@ export default function Settings({ onBack }: { onBack: () => void }) {
   const [deleteTarget, setDeleteTarget] = useState<UserWithRoles | null>(null);
   const [roleChangeTarget, setRoleChangeTarget] = useState<UserWithRoles | null>(null);
   const [newRoles, setNewRoles] = useState<AppRole[]>([]);
+  const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", password: "" });
+  const [saving, setSaving] = useState(false);
 
   const [inviteForm, setInviteForm] = useState({
     full_name: "",
