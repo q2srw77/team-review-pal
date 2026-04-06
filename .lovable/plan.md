@@ -1,32 +1,14 @@
 
 
-## Show Team & Complete-By + Filter by Team Membership
+## Make Team Required, URL Optional
 
-### Overview
-Add Team name and Complete By columns to the Dashboard table, show them in RequestDetail, and filter requests so non-admin users only see requests belonging to their team(s) or submitted by them.
+### Changes to `src/components/RequestForm.tsx`
 
-### Changes
+1. **Validation guard** (line 44): Add `teamId` to the required check: `if (!user || !platform || !teamId) return;`
+2. **URL field** (around line 93): Remove `required` from the URL Input
+3. **Insert payload** (line 49): Change to `url_location: urlLocation.trim() || null`
+4. **Submit button** (around line 120): Add `!teamId` to disabled condition
+5. **Team Select**: No UI change needed — it's already rendered; just enforcing it as required
 
-**`src/pages/Dashboard.tsx`**
-- Fetch the user's team IDs from `team_members` on mount
-- Build a team name lookup map by fetching from `teams` table
-- Filter logic in `fetchRequests`:
-  - **Admins**: see all requests (no filter)
-  - **Non-admins**: fetch requests where `team_id` is in the user's team IDs, OR `submitted_by` equals the user, OR `team_id` is null
-- Add "Team" and "Complete By" columns to the table
-- Display team name from the lookup map, and format `complete_by` date
-
-**`src/components/RequestDetail.tsx`**
-- Fetch team name from `teams` table using `request.team_id`
-- Add Team and Complete By fields to the metadata grid (making it handle the extra rows)
-- Show team name or "None" and formatted complete_by date or "Not set"
-
-### Files to modify
-
-| File | Change |
-|------|--------|
-| `src/pages/Dashboard.tsx` | Add team/date columns, fetch user teams, filter requests by team membership |
-| `src/components/RequestDetail.tsx` | Show team name and complete-by date in the detail view |
-
-No database changes needed.
+Single file change, no database migration needed.
 
