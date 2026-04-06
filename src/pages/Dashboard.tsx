@@ -84,6 +84,25 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
       const updated = data?.find((r) => r.id === selected.id);
       if (updated) setSelected(updated);
     }
+
+    // Fetch reviewer progress for all requests
+    const ids = (data ?? []).map((r) => r.id);
+    if (ids.length > 0) {
+      const { data: statuses } = await supabase
+        .from("review_statuses")
+        .select("request_id, status")
+        .in("request_id", ids);
+      const map = new Map<string, { completed: number; total: number }>();
+      for (const s of statuses ?? []) {
+        const entry = map.get(s.request_id) ?? { completed: 0, total: 0 };
+        entry.total++;
+        if (s.status === "completed") entry.completed++;
+        map.set(s.request_id, entry);
+      }
+      setProgressMap(map);
+    } else {
+      setProgressMap(new Map());
+    }
   }, [user, isAdmin, userTeamIds, selected]);
 
   useEffect(() => {
