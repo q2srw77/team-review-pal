@@ -2,14 +2,18 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Send, Clock, User, Users, Calendar, CheckCircle2, Circle, Loader2, Download } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
 type ReviewRequest = Database["public"]["Tables"]["review_requests"]["Row"];
@@ -67,13 +71,70 @@ export default function RequestDetail({
   const [teamName, setTeamName] = useState("");
   const [reviewerStatuses, setReviewerStatuses] = useState<ReviewerStatus[]>([]);
 
+  // Edit mode state
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editPlatform, setEditPlatform] = useState("");
+  const [editUrl, setEditUrl] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editCompleteBy, setEditCompleteBy] = useState<Date | undefined>();
+  const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     if (!request || !open) return;
     fetchNotes();
     fetchSubmitter();
     fetchTeam();
     fetchReviewerStatuses();
+    setEditing(false);
   }, [request, open]);
+
+  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
+
+  const enterEditMode = async () => {
+    if (!request) return;
+    setEditTitle(request.title);
+    setEditPlatform(request.platform);
+    setEditUrl(request.url_location || "");
+    setEditNotes(request.notes || "");
+    setEditCompleteBy(request.complete_by ? new Date(request.complete_by + "T00:00:00") : undefined);
+
+    // Fetch platforms for dropdown
+    const { data } = await supabase.from("platforms").select("id, name").order("name");
+    setPlatforms(data ?? []);
+    setEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+  };
+
+  const saveEdit = async () => {
+    if (!request || !editTitle.trim() || !editPlatform || !editCompleteBy) {
+      toast({ title: "Missing fields", description: "Title, platform, and complete by date are required.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const { error } = await supabase
+      .from("review_requests")
+      .update({
+        title: editTitle.trim(),
+        platform: editPlatform,
+        url_location: editUrl.trim() || "",
+        notes: editNotes.trim(),
+        complete_by: format(editCompleteBy, "yyyy-MM-dd"),
+      })
+      .eq("id", request.id);
+    setSaving(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Updated", description: "Review request updated successfully." });
+      setEditing(false);
+      onUpdated();
+    }
+  };
 
   const fetchSubmitter = async () => {
     if (!request) return;
@@ -190,13 +251,38 @@ export default function RequestDetail({
 
   if (!request) return null;
 
-  const myReviewStatus = reviewerStatuses.find((r) => r.reviewer_id === user?.id);
-
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle className="text-xl">{request.title}</SheetTitle>
+          <div className="flex items-start justify-between gap-2">
+            <SheetTitle className="text-xl flex-1">
+              {editing ? (
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="text-xl font-semibold"
+                />
+              ) : (
+                request.title
+              )}
+            </SheetTitle>
+            {canEdit && !editing && (
+              <Button variant="ghost" size="sm" onClick={enterEditMode}>
+                <Pencil className="w-4 h-4 mr-1" /> Edit
+              </Button>
+            )}
+            {editing && (
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                  <X className="w-4 h-4 mr-1" /> Cancel
+                </Button>
+                <Button size="sm" onClick={saveEdit} disabled={saving}>
+                  <Save className="w-4 h-4 mr-1" /> {saving ? "Saving…" : "Save"}
+                </Button>
+              </div>
+            )}
+          </div>
         </SheetHeader>
 
         <div className="mt-6 space-y-5">
@@ -204,7 +290,20 @@ export default function RequestDetail({
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground block mb-1">Platform</span>
-              <Badge variant="secondary">{request.platform}</Badge>
+              {editing ? (
+                <Select value={editPlatform} onValueChange={setEditPlatform}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {platforms.map((p) => (
+                      <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Badge variant="secondary">{request.platform}</Badge>
+              )}
             </div>
             <div>
               <span className="text-muted-foreground block mb-1">Overall Status</span>
@@ -221,10 +320,37 @@ export default function RequestDetail({
             </div>
             <div>
               <span className="text-muted-foreground block mb-1">Complete By</span>
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" />
-                {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "Not set"}
-              </span>
+              {editing ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-8",
+                        !editCompleteBy && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="w-3.5 h-3.5 mr-1" />
+                      {editCompleteBy ? format(editCompleteBy, "MMM d, yyyy") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={editCompleteBy}
+                      onSelect={setEditCompleteBy}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "Not set"}
+                </span>
+              )}
             </div>
             <div>
               <span className="text-muted-foreground block mb-1">Submitted by</span>
@@ -237,22 +363,40 @@ export default function RequestDetail({
           </div>
 
           {/* URL */}
-          {request.url_location && (
-            <div>
-              <span className="text-muted-foreground text-sm block mb-1">URL</span>
+          <div>
+            <span className="text-muted-foreground text-sm block mb-1">URL</span>
+            {editing ? (
+              <Input
+                value={editUrl}
+                onChange={(e) => setEditUrl(e.target.value)}
+                placeholder="https://..."
+                className="h-8"
+              />
+            ) : request.url_location ? (
               <a href={request.url_location} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1 text-sm break-all">
                 {request.url_location} <ExternalLink className="w-3.5 h-3.5 shrink-0" />
               </a>
-            </div>
-          )}
+            ) : (
+              <span className="text-sm text-muted-foreground">Not provided</span>
+            )}
+          </div>
 
           {/* Notes from submitter */}
-          {request.notes && (
-            <div>
-              <span className="text-muted-foreground text-sm block mb-1">Notes</span>
+          <div>
+            <span className="text-muted-foreground text-sm block mb-1">Notes</span>
+            {editing ? (
+              <Textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                rows={3}
+                maxLength={2000}
+              />
+            ) : request.notes ? (
               <p className="text-sm bg-secondary/50 rounded-lg p-3">{request.notes}</p>
-            </div>
-          )}
+            ) : (
+              <span className="text-sm text-muted-foreground">No notes</span>
+            )}
+          </div>
 
           {/* Download Report */}
           {request.report_pdf_path && (
