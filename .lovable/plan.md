@@ -1,51 +1,44 @@
 
 
-## Email Notification for New Review Requests
+## Per-Reviewer Status Tracking
 
-### Overview
-When a user submits a new review request, email all members of the selected team to notify them.
+### Problem
+Currently, any reviewer can change the global request status to "completed," which marks the entire review as done even if other team members haven't reviewed it yet.
 
-### Prerequisites — Email Domain Setup
-This project has no email domain configured yet. Before we can send any emails, we need to set up email sending infrastructure. This involves:
+### Solution
+Introduce per-reviewer completion tracking. Each team member marks their own review as done. The overall request status automatically becomes "completed" only when all team members have finished.
 
-1. **Configure an email domain** — you'll need a domain you own (e.g., `yourdomain.com`) so emails come from your brand instead of a generic address
-2. **Set up email infrastructure** — database tables for queuing, logging, and retry handling
-3. **Scaffold transactional email templates** — the Edge Function and template for sending app emails
+### Database Changes
 
-### Implementation Steps
+**New table: `review_statuses`**
+- `id` (uuid, PK)
+- `request_id` (uuid, FK to review_requests, not null)
+- `reviewer_id` (uuid, not null — the user marking their status)
+- `status` (text, not null, default 'pending' — values: 'pending', 'in_review', 'completed')
+- `updated_at` (timestamptz, default now())
+- Unique constraint on (request_id, reviewer_id)
+- RLS: SELECT for authenticated; INSERT/UPDATE for the reviewer themselves (reviewer_id = auth.uid()) who also has reviewer role
 
-**Step 1: Email domain setup**
-You'll be prompted to configure a sender domain through a setup dialog.
+**Auto-populate trigger**: When a review_request is inserted, automatically create a `review_statuses` row for each member of the assigned team (from `team_members`).
 
-**Step 2: Email infrastructure + transactional scaffold**
-Automatically creates the sending pipeline (queue, retry, suppression list, unsubscribe handling).
+**Auto-update trigger on `review_statuses`**: After any update to `review_statuses`, check if ALL reviewers for that request are "completed." If yes, set `review_requests.status` to 'completed'. If any are 'in_review', set to 'in_review'. Otherwise keep 'pending'.
 
-**Step 3: Create notification template**
-A React Email template (`new-review-request.tsx`) showing:
-- The review request title
-- Platform and team name
-- Submitter name
-- Complete-by date
-- Link to view the request in the app
+### UI Changes
 
-**Step 4: Wire up the trigger in RequestForm**
-After a successful insert in `handleSubmit`:
-- Fetch team members from `team_members` joined with `profiles` to get emails
-- For each team member (excluding the submitter), call `send-transactional-email` with the template data
-- Each call gets a unique idempotency key (`review-notify-{requestId}-{userId}`)
+**`src/components/RequestDetail.tsx`**
+- Fetch `review_statuses` for the current request, joined with profiles for names
+- Show a "Reviewer Progress" section listing each reviewer with their individual status
+- If the current user is a reviewer on this request, show a status dropdown for **their own** status only (not the global one)
+- Remove the global status dropdown for reviewers — the overall status is now computed automatically
+- Show overall status as a read-only badge for everyone
 
-**Step 5: Create unsubscribe page**
-A branded page at `/unsubscribe` (or similar) for recipients to opt out.
+**`src/pages/Dashboard.tsx`**
+- No major changes — the overall `review_requests.status` field still drives the table badge (it's now auto-computed)
 
 ### Files to create/modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/_shared/transactional-email-templates/new-review-request.tsx` | New notification template |
-| `supabase/functions/_shared/transactional-email-templates/registry.ts` | Register the template |
-| `src/components/RequestForm.tsx` | Add email sending after successful insert |
-| New unsubscribe page + route | Branded unsubscribe UI |
-
-### Important Note
-Setting up the email domain is the first step. Once you approve this plan, I'll guide you through the domain setup dialog before proceeding with the rest.
+| New migration | Create `review_statuses` table, triggers for auto-populate and auto-update |
+| `src/components/RequestDetail.tsx` | Per-reviewer status UI, remove global status dropdown |
 
