@@ -228,6 +228,38 @@ export type Database = {
           },
         ]
       }
+      review_statuses: {
+        Row: {
+          id: string
+          request_id: string
+          reviewer_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          request_id: string
+          reviewer_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          request_id?: string
+          reviewer_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_statuses_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "review_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
