@@ -499,7 +499,8 @@ export default function RequestDetail({
                 })}
               </div>
             </div>
-          )}
+          ) : null;
+          })()}
 
           <Separator />
 
