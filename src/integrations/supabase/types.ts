@@ -93,39 +93,53 @@ export type Database = {
       }
       review_requests: {
         Row: {
+          complete_by: string | null
           created_at: string
           id: string
           notes: string
           platform: string
           status: Database["public"]["Enums"]["request_status"]
           submitted_by: string
+          team_id: string | null
           title: string
           updated_at: string
           url_location: string
         }
         Insert: {
+          complete_by?: string | null
           created_at?: string
           id?: string
           notes?: string
           platform: string
           status?: Database["public"]["Enums"]["request_status"]
           submitted_by: string
+          team_id?: string | null
           title: string
           updated_at?: string
           url_location?: string
         }
         Update: {
+          complete_by?: string | null
           created_at?: string
           id?: string
           notes?: string
           platform?: string
           status?: Database["public"]["Enums"]["request_status"]
           submitted_by?: string
+          team_id?: string | null
           title?: string
           updated_at?: string
           url_location?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "review_requests_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       team_members: {
         Row: {
