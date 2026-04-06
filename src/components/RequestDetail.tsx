@@ -93,6 +93,8 @@ export default function RequestDetail({
   const [editCompleteBy, setEditCompleteBy] = useState<Date | undefined>();
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!request || !open) return;
@@ -103,7 +105,8 @@ export default function RequestDetail({
     setEditing(false);
   }, [request, open]);
 
-  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
+  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed" && request?.status !== "archived";
+  const canArchiveDelete = user?.id === request?.submitted_by || isAdmin;
 
   const enterEditMode = async () => {
     if (!request) return;
