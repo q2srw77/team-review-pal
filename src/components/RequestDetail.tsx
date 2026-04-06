@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Send, Clock, User } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
@@ -51,11 +51,13 @@ export default function RequestDetail({
   const [newNote, setNewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitterName, setSubmitterName] = useState("");
+  const [teamName, setTeamName] = useState("");
 
   useEffect(() => {
     if (!request || !open) return;
     fetchNotes();
     fetchSubmitter();
+    fetchTeam();
   }, [request, open]);
 
   const fetchSubmitter = async () => {
@@ -66,6 +68,19 @@ export default function RequestDetail({
       .eq("user_id", request.submitted_by)
       .single();
     setSubmitterName(data?.full_name ?? "Unknown");
+  };
+
+  const fetchTeam = async () => {
+    if (!request?.team_id) {
+      setTeamName("");
+      return;
+    }
+    const { data } = await supabase
+      .from("teams")
+      .select("name")
+      .eq("id", request.team_id)
+      .single();
+    setTeamName(data?.name ?? "Unknown");
   };
 
   const fetchNotes = async () => {
@@ -160,6 +175,20 @@ export default function RequestDetail({
                   {STATUS_LABELS[request.status]}
                 </Badge>
               )}
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Team</span>
+              <span className="flex items-center gap-1">
+                <Users className="w-3.5 h-3.5" />
+                {teamName || "None"}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block mb-1">Complete By</span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "Not set"}
+              </span>
             </div>
             <div>
               <span className="text-muted-foreground block mb-1">Submitted by</span>

@@ -6,7 +6,7 @@ import RequestDetail from "@/components/RequestDetail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ClipboardCheck, LogOut, Settings } from "lucide-react";
+import { ClipboardCheck, LogOut, Settings, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -30,23 +30,63 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
   const [requests, setRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
+  const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
+
+  // Fetch teams lookup and user's team memberships
+  useEffect(() => {
+    const fetchTeams = async () => {
+      const { data } = await supabase.from("teams").select("id, name");
+      setTeamMap(new Map(data?.map((t) => [t.id, t.name]) ?? []));
+    };
+    const fetchUserTeams = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("team_members")
+        .select("team_id")
+        .eq("user_id", user.id);
+      setUserTeamIds(data?.map((m) => m.team_id) ?? []);
+    };
+    fetchTeams();
+    fetchUserTeams();
+  }, [user]);
 
   const fetchRequests = useCallback(async () => {
-    const { data } = await supabase
-      .from("review_requests")
-      .select("*")
-      .order("created_at", { ascending: false });
+    if (!user) return;
+
+    let data: ReviewRequest[] | null = null;
+
+    if (isAdmin) {
+      const res = await supabase
+        .from("review_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+      data = res.data;
+    } else {
+      // Non-admins: requests in their teams, submitted by them, or unassigned
+      const res = await supabase
+        .from("review_requests")
+        .select("*")
+        .order("created_at", { ascending: false });
+      
+      // Client-side filter since OR with in/is.null is complex
+      data = (res.data ?? []).filter((r) =>
+        r.submitted_by === user.id ||
+        r.team_id === null ||
+        userTeamIds.includes(r.team_id ?? "")
+      );
+    }
+
     setRequests(data ?? []);
-    // refresh selected if open
     if (selected) {
       const updated = data?.find((r) => r.id === selected.id);
       if (updated) setSelected(updated);
     }
-  }, [selected]);
+  }, [user, isAdmin, userTeamIds, selected]);
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    if (user) fetchRequests();
+  }, [user, userTeamIds]);
 
   const openDetail = (r: ReviewRequest) => {
     setSelected(r);
@@ -55,7 +95,6 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-30 bg-card border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -80,7 +119,6 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        {/* Top bar */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Review Requests</h2>
@@ -89,7 +127,6 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
           <RequestForm onCreated={fetchRequests} />
         </div>
 
-        {/* Table */}
         {requests.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-20 text-center">
             <ClipboardCheck className="w-12 h-12 text-muted-foreground/40 mb-4" />
@@ -104,7 +141,9 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                   <tr className="border-b border-border bg-secondary/40">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Title</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Platform</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Team</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Complete By</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Date</th>
                   </tr>
                 </thead>
@@ -119,10 +158,21 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                       <td className="py-3 px-4">
                         <Badge variant="secondary">{r.platform}</Badge>
                       </td>
+                      <td className="py-3 px-4 text-muted-foreground hidden lg:table-cell">
+                        {r.team_id ? teamMap.get(r.team_id) ?? "—" : "—"}
+                      </td>
                       <td className="py-3 px-4">
                         <Badge variant="outline" className={STATUS_STYLES[r.status]}>
                           {STATUS_LABELS[r.status]}
                         </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
+                        {r.complete_by ? (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {format(new Date(r.complete_by), "MMM d, yyyy")}
+                          </span>
+                        ) : "—"}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
                         {format(new Date(r.created_at), "MMM d, yyyy")}
