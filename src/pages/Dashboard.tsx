@@ -81,7 +81,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
       );
     }
 
-    setRequests(data ?? []);
+    setRequests((data ?? []).filter((r) => r.status !== "archived"));
     if (selected) {
       const updated = data?.find((r) => r.id === selected.id);
       if (updated) setSelected(updated);

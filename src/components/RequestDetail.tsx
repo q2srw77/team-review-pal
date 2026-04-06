@@ -588,6 +588,56 @@ export default function RequestDetail({
               </div>
             )}
           </div>
+
+          {/* Archive / Delete actions */}
+          {canArchiveDelete && request.status !== "archived" && (
+            <>
+              <Separator />
+              <div className="flex items-center gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10" disabled={archiving}>
+                      <Archive className="w-4 h-4 mr-1.5" />
+                      {archiving ? "Archiving…" : "Archive"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Archive this request?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will move the request to archived status. It will no longer appear in the default dashboard view.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={archiveRequest}>Archive</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={deleting}>
+                      <Trash2 className="w-4 h-4 mr-1.5" />
+                      {deleting ? "Deleting…" : "Delete"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this request permanently?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. The request, all reviewer statuses, and all notes will be permanently deleted.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteRequest} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </>
+          )}
         </div>
       </SheetContent>
     </Sheet>
