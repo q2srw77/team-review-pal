@@ -1,0 +1,355 @@
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ArrowLeft, ClipboardCheck, MoreHorizontal, Plus, UserPlus } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import type { Database } from "@/integrations/supabase/types";
+
+type AppRole = Database["public"]["Enums"]["app_role"];
+
+interface UserWithRole {
+  user_id: string;
+  full_name: string;
+  email: string;
+  role: AppRole;
+  created_at: string;
+}
+
+const ROLE_STYLES: Record<AppRole, string> = {
+  admin: "bg-primary/15 text-primary border-primary/30",
+  reviewer: "bg-accent/15 text-accent border-accent/30",
+  submitter: "bg-muted text-muted-foreground border-border",
+};
+
+export default function Settings({ onBack }: { onBack: () => void }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserWithRole | null>(null);
+  const [roleChangeTarget, setRoleChangeTarget] = useState<UserWithRole | null>(null);
+  const [newRole, setNewRole] = useState<AppRole>("submitter");
+
+  // Invite form state
+  const [inviteForm, setInviteForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    role: "submitter" as AppRole,
+  });
+
+  const fetchUsers = useCallback(async () => {
+    // Get profiles + roles
+    const [{ data: profiles }, { data: roles }] = await Promise.all([
+      supabase.from("profiles").select("user_id, full_name, created_at"),
+      supabase.from("user_roles").select("user_id, role"),
+    ]);
+
+    if (!profiles) {
+      setLoading(false);
+      return;
+    }
+
+    const userList: UserWithRole[] = profiles.map((p) => {
+      const userRole = roles?.find((r) => r.user_id === p.user_id);
+      return {
+        user_id: p.user_id,
+        full_name: p.full_name,
+        email: "", // We'll show name; email not in profiles
+        role: (userRole?.role as AppRole) ?? "submitter",
+        created_at: p.created_at,
+      };
+    });
+
+    setUsers(userList);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleInvite = async () => {
+    if (!inviteForm.email || !inviteForm.password || !inviteForm.full_name) {
+      toast({ title: "All fields are required", variant: "destructive" });
+      return;
+    }
+    setInviting(true);
+    const { data, error } = await supabase.functions.invoke("invite-user", {
+      body: inviteForm,
+    });
+    setInviting(false);
+
+    if (error || data?.error) {
+      toast({ title: data?.error || error?.message || "Failed to invite user", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "User invited successfully" });
+    setInviteOpen(false);
+    setInviteForm({ full_name: "", email: "", password: "", role: "submitter" });
+    fetchUsers();
+  };
+
+  const handleRoleChange = async () => {
+    if (!roleChangeTarget) return;
+    const { data, error } = await supabase.functions.invoke("manage-user", {
+      body: { action: "update_role", user_id: roleChangeTarget.user_id, role: newRole },
+    });
+
+    if (error || data?.error) {
+      toast({ title: data?.error || error?.message || "Failed to update role", variant: "destructive" });
+    } else {
+      toast({ title: "Role updated" });
+      fetchUsers();
+    }
+    setRoleChangeTarget(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const { data, error } = await supabase.functions.invoke("manage-user", {
+      body: { action: "delete_user", user_id: deleteTarget.user_id },
+    });
+
+    if (error || data?.error) {
+      toast({ title: data?.error || error?.message || "Failed to remove user", variant: "destructive" });
+    } else {
+      toast({ title: "User removed" });
+      fetchUsers();
+    }
+    setDeleteTarget(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-30 bg-card border-b border-border">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
+              <ClipboardCheck className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight text-foreground">Settings</h1>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Users</h2>
+            <p className="text-sm text-muted-foreground mt-1">{users.length} team members</p>
+          </div>
+          <Button onClick={() => setInviteOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Invite User
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
+          </div>
+        ) : users.length === 0 ? (
+          <Card className="flex flex-col items-center justify-center py-20 text-center">
+            <Plus className="w-12 h-12 text-muted-foreground/40 mb-4" />
+            <p className="text-muted-foreground font-medium">No users yet</p>
+          </Card>
+        ) : (
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-secondary/40">
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Role</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Joined</th>
+                    <th className="py-3 px-4 w-10"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.user_id} className="border-b border-border/60 last:border-0 hover:bg-secondary/30 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-medium text-foreground">{u.full_name}</div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge variant="outline" className={ROLE_STYLES[u.role]}>
+                          {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
+                        {format(new Date(u.created_at), "MMM d, yyyy")}
+                      </td>
+                      <td className="py-3 px-4">
+                        {u.user_id !== user?.id && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setRoleChangeTarget(u); setNewRole(u.role); }}>
+                                Change Role
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(u)}>
+                                Remove User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Invite Dialog */}
+      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite User</DialogTitle>
+            <DialogDescription>Create an account for a new team member.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input
+                value={inviteForm.full_name}
+                onChange={(e) => setInviteForm((f) => ({ ...f, full_name: e.target.value }))}
+                placeholder="Jane Doe"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={inviteForm.email}
+                onChange={(e) => setInviteForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="jane@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                value={inviteForm.password}
+                onChange={(e) => setInviteForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Min 6 characters"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={inviteForm.role} onValueChange={(v) => setInviteForm((f) => ({ ...f, role: v as AppRole }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="reviewer">Reviewer</SelectItem>
+                  <SelectItem value="submitter">Submitter</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInviteOpen(false)}>Cancel</Button>
+            <Button onClick={handleInvite} disabled={inviting}>
+              {inviting ? "Inviting..." : "Invite"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Role Change Dialog */}
+      <Dialog open={!!roleChangeTarget} onOpenChange={(o) => !o && setRoleChangeTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Role</DialogTitle>
+            <DialogDescription>Update role for {roleChangeTarget?.full_name}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Select value={newRole} onValueChange={(v) => setNewRole(v as AppRole)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="reviewer">Reviewer</SelectItem>
+                <SelectItem value="submitter">Submitter</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleChangeTarget(null)}>Cancel</Button>
+            <Button onClick={handleRoleChange}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove {deleteTarget?.full_name}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>Remove</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

@@ -7,6 +7,7 @@ interface AuthContext {
   session: Session | null;
   loading: boolean;
   isReviewer: boolean;
+  isAdmin: boolean;
   profileName: string;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -19,6 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isReviewer, setIsReviewer] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [profileName, setProfileName] = useState("");
 
   useEffect(() => {
@@ -29,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!session?.user) {
           setLoading(false);
           setIsReviewer(false);
+          setIsAdmin(false);
           setProfileName("");
         }
       }
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from("profiles").select("full_name").eq("user_id", user.id).single(),
       ]);
       setIsReviewer(roles?.some((r) => r.role === "reviewer") ?? false);
+      setIsAdmin(roles?.some((r) => r.role === "admin") ?? false);
       setProfileName(profile?.full_name ?? user.email ?? "");
       setLoading(false);
     };
@@ -67,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isReviewer, profileName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, isReviewer, isAdmin, profileName, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
