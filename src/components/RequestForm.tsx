@@ -43,7 +43,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttempted(true);
-    if (!user || !title.trim() || !platform || !teamId) return;
+    if (!user || !title.trim() || !platform || !teamId || !completeBy || !notes.trim()) return;
     setSubmitting(true);
     const { error } = await supabase.from("review_requests").insert({
       title: title.trim(),
@@ -107,10 +107,10 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
             <Input id="url" value={urlLocation} onChange={(e) => setUrlLocation(e.target.value)} placeholder="https://..." maxLength={500} />
           </div>
           <div className="space-y-2">
-            <Label>Complete By</Label>
+            <Label>Complete By<RequiredStar /></Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !completeBy && "text-muted-foreground")}>
+                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !completeBy && "text-muted-foreground", attempted && !completeBy && "border-destructive")}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {completeBy ? format(completeBy, "PPP") : <span>Pick a date</span>}
                 </Button>
@@ -119,10 +119,12 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
                 <Calendar mode="single" selected={completeBy} onSelect={setCompleteBy} initialFocus className={cn("p-3 pointer-events-auto")} />
               </PopoverContent>
             </Popover>
+            {attempted && !completeBy && <p className="text-sm text-destructive">Complete By date is required</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional context…" rows={3} maxLength={2000} />
+            <Label htmlFor="notes">Notes<RequiredStar /></Label>
+            <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional context…" rows={3} maxLength={2000} className={cn(attempted && !notes.trim() && "border-destructive")} />
+            {attempted && !notes.trim() && <p className="text-sm text-destructive">Notes are required</p>}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
