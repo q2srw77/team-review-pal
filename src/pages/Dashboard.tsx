@@ -253,15 +253,21 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                       </td>
                       <td className="py-3 px-4">
                         {r.report_pdf_path && (
-                          <a
-                            href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/review-reports/${r.report_pdf_path}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const { data, error } = await supabase.storage
+                                .from("review-reports")
+                                .createSignedUrl(r.report_pdf_path!, 3600);
+                              if (data?.signedUrl) {
+                                window.open(data.signedUrl, "_blank");
+                              }
+                            }}
                             title="Download Report"
+                            className="inline-flex"
                           >
                             <Download className="w-4 h-4 text-primary hover:text-primary/80" />
-                          </a>
+                          </button>
                         )}
                       </td>
                     </tr>
