@@ -152,7 +152,40 @@ export default function RequestDetail({
     }
   };
 
-  const fetchSubmitter = async () => {
+  const archiveRequest = async () => {
+    if (!request) return;
+    setArchiving(true);
+    const { error } = await supabase
+      .from("review_requests")
+      .update({ status: "archived" as RequestStatus })
+      .eq("id", request.id);
+    setArchiving(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Archived", description: "Request has been archived." });
+      onUpdated();
+      onClose();
+    }
+  };
+
+  const deleteRequest = async () => {
+    if (!request) return;
+    setDeleting(true);
+    // Delete related data first
+    await supabase.from("review_statuses").delete().eq("request_id", request.id);
+    await supabase.from("request_notes").delete().eq("request_id", request.id);
+    const { error } = await supabase.from("review_requests").delete().eq("id", request.id);
+    setDeleting(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: "Request has been permanently deleted." });
+      onUpdated();
+      onClose();
+    }
+  };
+
     if (!request) return;
     const { data } = await supabase
       .from("profiles")
