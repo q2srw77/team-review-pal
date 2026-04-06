@@ -359,6 +359,11 @@ export default function RequestDetail({
               },
             });
           }
+
+          // Trigger PDF report generation
+          await supabase.functions.invoke("generate-review-report", {
+            body: { request_id: request.id },
+          });
         }
       }
     }
