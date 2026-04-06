@@ -185,6 +185,7 @@ export type Database = {
           id: string
           notes: string
           platform: string
+          report_pdf_path: string | null
           status: Database["public"]["Enums"]["request_status"]
           submitted_by: string
           team_id: string | null
@@ -198,6 +199,7 @@ export type Database = {
           id?: string
           notes?: string
           platform: string
+          report_pdf_path?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submitted_by: string
           team_id?: string | null
@@ -211,6 +213,7 @@ export type Database = {
           id?: string
           notes?: string
           platform?: string
+          report_pdf_path?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           submitted_by?: string
           team_id?: string | null

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { ExternalLink, Send, Clock, User, Users, Calendar, CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar, CheckCircle2, Circle, Loader2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
@@ -251,6 +251,22 @@ export default function RequestDetail({
             <div>
               <span className="text-muted-foreground text-sm block mb-1">Notes</span>
               <p className="text-sm bg-secondary/50 rounded-lg p-3">{request.notes}</p>
+            </div>
+          )}
+
+          {/* Download Report */}
+          {request.report_pdf_path && (
+            <div>
+              <a
+                href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/review-reports/${request.report_pdf_path}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Button variant="outline" size="sm" className="w-full">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Review Report (PDF)
+                </Button>
+              </a>
             </div>
           )}
 
