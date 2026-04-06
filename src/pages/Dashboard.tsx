@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ClipboardCheck, LogOut, Settings, Calendar, Download } from "lucide-react";
-import { format } from "date-fns";
+import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle } from "lucide-react";
+import { format, differenceInDays } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
 type ReviewRequest = Database["public"]["Tables"]["review_requests"]["Row"];
@@ -81,7 +81,14 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
       );
     }
 
-    setRequests((data ?? []).filter((r) => r.status !== "archived"));
+    const filtered = (data ?? []).filter((r) => r.status !== "archived");
+    filtered.sort((a, b) => {
+      if (!a.complete_by && !b.complete_by) return 0;
+      if (!a.complete_by) return 1;
+      if (!b.complete_by) return -1;
+      return new Date(a.complete_by).getTime() - new Date(b.complete_by).getTime();
+    });
+    setRequests(filtered);
     if (selected) {
       const updated = data?.find((r) => r.id === selected.id);
       if (updated) setSelected(updated);
@@ -179,7 +186,14 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                       onClick={() => openDetail(r)}
                       className="border-b border-border/60 last:border-0 hover:bg-secondary/30 cursor-pointer transition-colors"
                     >
-                      <td className="py-3 px-4 font-medium text-foreground">{r.title}</td>
+                      <td className="py-3 px-4 font-medium text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          {r.title}
+                          {r.complete_by && differenceInDays(new Date(r.complete_by), new Date()) <= 3 && r.status !== "completed" && (
+                            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
+                          )}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">
                         <Badge variant="secondary">{r.platform}</Badge>
                       </td>
