@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      platforms: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -78,7 +96,7 @@ export type Database = {
           created_at: string
           id: string
           notes: string
-          platform: Database["public"]["Enums"]["platform_type"]
+          platform: string
           status: Database["public"]["Enums"]["request_status"]
           submitted_by: string
           title: string
@@ -89,7 +107,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string
-          platform: Database["public"]["Enums"]["platform_type"]
+          platform: string
           status?: Database["public"]["Enums"]["request_status"]
           submitted_by: string
           title: string
@@ -100,7 +118,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string
-          platform?: Database["public"]["Enums"]["platform_type"]
+          platform?: string
           status?: Database["public"]["Enums"]["request_status"]
           submitted_by?: string
           title?: string

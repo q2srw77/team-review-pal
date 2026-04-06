@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -9,20 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { Database } from "@/integrations/supabase/types";
-
-type Platform = Database["public"]["Enums"]["platform_type"];
-const PLATFORMS: Platform[] = ["Storylane", "Document", "AI Project", "MSP Project"];
 
 export default function RequestForm({ onCreated }: { onCreated: () => void }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
-  const [platform, setPlatform] = useState<Platform | "">("");
+  const [platform, setPlatform] = useState("");
   const [urlLocation, setUrlLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    supabase.from("platforms").select("id, name").order("name").then(({ data }) => {
+      if (data) setPlatforms(data);
+    });
+  }, [open]);
 
   const reset = () => { setTitle(""); setPlatform(""); setUrlLocation(""); setNotes(""); };
 
@@ -32,7 +35,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
     setSubmitting(true);
     const { error } = await supabase.from("review_requests").insert({
       title: title.trim(),
-      platform: platform as Platform,
+      platform: platform,
       url_location: urlLocation.trim(),
       notes: notes.trim(),
       submitted_by: user.id,
@@ -64,10 +67,10 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
           </div>
           <div className="space-y-2">
             <Label>Platform</Label>
-            <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+            <Select value={platform} onValueChange={setPlatform}>
               <SelectTrigger><SelectValue placeholder="Select platform" /></SelectTrigger>
               <SelectContent>
-                {PLATFORMS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                {platforms.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
