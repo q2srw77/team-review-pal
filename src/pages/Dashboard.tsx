@@ -6,6 +6,7 @@ import RequestDetail from "@/components/RequestDetail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { ClipboardCheck, LogOut, Settings, Calendar, Download } from "lucide-react";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
@@ -32,6 +33,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
+  const [progressMap, setProgressMap] = useState<Map<string, { completed: number; total: number }>>(new Map());
 
   // Fetch teams lookup and user's team memberships
   useEffect(() => {
@@ -81,6 +83,25 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
     if (selected) {
       const updated = data?.find((r) => r.id === selected.id);
       if (updated) setSelected(updated);
+    }
+
+    // Fetch reviewer progress for all requests
+    const ids = (data ?? []).map((r) => r.id);
+    if (ids.length > 0) {
+      const { data: statuses } = await supabase
+        .from("review_statuses")
+        .select("request_id, status")
+        .in("request_id", ids);
+      const map = new Map<string, { completed: number; total: number }>();
+      for (const s of statuses ?? []) {
+        const entry = map.get(s.request_id) ?? { completed: 0, total: 0 };
+        entry.total++;
+        if (s.status === "completed") entry.completed++;
+        map.set(s.request_id, entry);
+      }
+      setProgressMap(map);
+    } else {
+      setProgressMap(new Map());
     }
   }, [user, isAdmin, userTeamIds, selected]);
 
@@ -143,6 +164,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Platform</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden lg:table-cell">Team</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden sm:table-cell">Progress</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Submitted</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Complete By</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground w-10"></th>
@@ -166,6 +188,19 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                         <Badge variant="outline" className={STATUS_STYLES[r.status]}>
                           {STATUS_LABELS[r.status]}
                         </Badge>
+                      </td>
+                      <td className="py-3 px-4 hidden sm:table-cell">
+                        {(() => {
+                          const p = progressMap.get(r.id);
+                          if (!p || p.total === 0) return <span className="text-muted-foreground text-xs">—</span>;
+                          const pct = Math.round((p.completed / p.total) * 100);
+                          return (
+                            <div className="flex items-center gap-2 min-w-[80px]">
+                              <span className="text-xs font-medium text-foreground whitespace-nowrap">{p.completed}/{p.total}</span>
+                              <Progress value={pct} className="h-2 flex-1" />
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
                         {format(new Date(r.created_at), "MMM d, yyyy")}
