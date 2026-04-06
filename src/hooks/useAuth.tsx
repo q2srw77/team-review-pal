@@ -2,12 +2,15 @@ import { useState, useEffect, createContext, useContext, type ReactNode } from "
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
+type AppRole = "admin" | "reviewer" | "submitter";
+
 interface AuthContext {
   user: User | null;
   session: Session | null;
   loading: boolean;
   isReviewer: boolean;
   isAdmin: boolean;
+  roles: AppRole[];
   profileName: string;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -21,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isReviewer, setIsReviewer] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [roles, setRoles] = useState<AppRole[]>([]);
   const [profileName, setProfileName] = useState("");
 
   useEffect(() => {
@@ -32,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
           setIsReviewer(false);
           setIsAdmin(false);
+          setRoles([]);
           setProfileName("");
         }
       }
@@ -53,8 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.from("user_roles").select("role").eq("user_id", user.id),
         supabase.from("profiles").select("full_name").eq("user_id", user.id).single(),
       ]);
-      setIsReviewer(roles?.some((r) => r.role === "reviewer") ?? false);
-      setIsAdmin(roles?.some((r) => r.role === "admin") ?? false);
+      const roleList = roles?.map((r) => r.role as AppRole) ?? [];
+      setRoles(roleList);
+      setIsReviewer(roleList.includes("reviewer"));
+      setIsAdmin(roleList.includes("admin"));
       setProfileName(profile?.full_name ?? user.email ?? "");
       setLoading(false);
     };
@@ -71,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isReviewer, isAdmin, profileName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, isReviewer, isAdmin, roles, profileName, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
