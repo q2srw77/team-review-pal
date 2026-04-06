@@ -1,19 +1,30 @@
 
 
-## Add Reviewer Progress Indicator to Dashboard Table
+## Instant Notification When All Reviewers Complete
 
 ### Overview
-Add a "Progress" column to the dashboard table showing a fraction (e.g., "2/4") with a small progress bar for each review request.
+Currently the submitter only receives an email after the PDF report finishes generating (which can take several seconds). This change sends an immediate notification email right when the last reviewer marks "completed", separate from the PDF email that follows later.
 
-### Changes to `src/pages/Dashboard.tsx`
+### Approach
+After a reviewer updates their status in `RequestDetail`, check if all reviewers are now complete. If so, immediately invoke `send-transactional-email` with a new `review-all-complete` template to notify the submitter. The existing PDF generation + `review-completed` email flow remains unchanged.
 
-1. **Fetch reviewer progress data**: After fetching requests, batch-query `review_statuses` for all request IDs. Group by `request_id` to compute `completed` count and `total` count per request. Store in a `Map<string, {completed: number, total: number}>`.
+### New Email Template
+Create `supabase/functions/_shared/transactional-email-templates/review-all-complete.tsx` -- a simple notification saying "All reviewers have completed their review for [title]" without a PDF link (since the PDF isn't ready yet). Mention the report will follow shortly.
 
-2. **Add "Progress" column**: Insert a new table header between "Status" and "Submitted". Each cell shows:
-   - Text fraction: `2/4`
-   - A small `Progress` bar component (already exists in `src/components/ui/progress.tsx`) underneath, colored by completion percentage
+### Changes
 
-3. **Import** the `Progress` component from `@/components/ui/progress`
+**`supabase/functions/_shared/transactional-email-templates/review-all-complete.tsx`** (new)
+- Simple template: heading, request title, platform, team name, message that all reviewers are done and a PDF report will follow
 
-### Single file change: `src/pages/Dashboard.tsx`
+**`supabase/functions/_shared/transactional-email-templates/registry.ts`**
+- Register the new `review-all-complete` template
+
+**`src/components/RequestDetail.tsx`**
+- In `updateMyReviewStatus`, after the successful status update:
+  1. Re-fetch reviewer statuses
+  2. Check if all statuses are now "completed"
+  3. If yes, fetch the submitter's email from `profiles` and invoke `send-transactional-email` with `templateName: 'review-all-complete'`
+
+### Redeploy
+Deploy `send-transactional-email` after template changes.
 
