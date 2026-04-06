@@ -25,6 +25,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
   const [teamId, setTeamId] = useState("");
   const [completeBy, setCompleteBy] = useState<Date | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
   const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
 
@@ -37,11 +38,12 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
     });
   }, [open]);
 
-  const reset = () => { setTitle(""); setPlatform(""); setUrlLocation(""); setNotes(""); setTeamId(""); setCompleteBy(undefined); };
+  const reset = () => { setTitle(""); setPlatform(""); setUrlLocation(""); setNotes(""); setTeamId(""); setCompleteBy(undefined); setAttempted(false); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !platform || !teamId) return;
+    setAttempted(true);
+    if (!user || !title.trim() || !platform || !teamId) return;
     setSubmitting(true);
     const { error } = await supabase.from("review_requests").insert({
       title: title.trim(),
@@ -63,6 +65,8 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
     }
   };
 
+  const RequiredStar = () => <span className="text-destructive ml-0.5">*</span>;
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -74,26 +78,29 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project title" maxLength={255} />
+            <Label htmlFor="title">Title<RequiredStar /></Label>
+            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project title" maxLength={255} className={cn(attempted && !title.trim() && "border-destructive")} />
+            {attempted && !title.trim() && <p className="text-sm text-destructive">Title is required</p>}
           </div>
           <div className="space-y-2">
-            <Label>Platform</Label>
+            <Label>Platform<RequiredStar /></Label>
             <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger><SelectValue placeholder="Select platform" /></SelectTrigger>
+              <SelectTrigger className={cn(attempted && !platform && "border-destructive")}><SelectValue placeholder="Select platform" /></SelectTrigger>
               <SelectContent>
                 {platforms.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            {attempted && !platform && <p className="text-sm text-destructive">Platform is required</p>}
           </div>
           <div className="space-y-2">
-            <Label>Team</Label>
+            <Label>Team<RequiredStar /></Label>
             <Select value={teamId} onValueChange={setTeamId}>
-              <SelectTrigger><SelectValue placeholder="Select team (optional)" /></SelectTrigger>
+              <SelectTrigger className={cn(attempted && !teamId && "border-destructive")}><SelectValue placeholder="Select team" /></SelectTrigger>
               <SelectContent>
                 {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            {attempted && !teamId && <p className="text-sm text-destructive">Team is required</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="url">URL Location</Label>
@@ -119,7 +126,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={submitting || !platform || !teamId}>{submitting ? "Submitting…" : "Submit"}</Button>
+            <Button type="submit" disabled={submitting}>{submitting ? "Submitting…" : "Submit"}</Button>
           </div>
         </form>
       </DialogContent>
