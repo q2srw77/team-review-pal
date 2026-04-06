@@ -124,6 +124,10 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
     setDetailOpen(true);
   };
 
+  const activeRequests = allRequests.filter((r) => r.status !== "archived");
+  const archivedRequests = allRequests.filter((r) => r.status === "archived");
+  const requests = view === "active" ? activeRequests : archivedRequests;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 bg-card border-b border-border">
