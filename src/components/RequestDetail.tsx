@@ -10,7 +10,18 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Archive, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -37,12 +48,14 @@ const STATUS_STYLES: Record<RequestStatus, string> = {
   pending: "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.3)]",
   in_review: "bg-[hsl(var(--status-in-review)/0.15)] text-[hsl(var(--status-in-review))] border-[hsl(var(--status-in-review)/0.3)]",
   completed: "bg-[hsl(var(--status-completed)/0.15)] text-[hsl(var(--status-completed))] border-[hsl(var(--status-completed)/0.3)]",
+  archived: "bg-muted text-muted-foreground border-muted-foreground/30",
 };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   pending: "Pending",
   in_review: "In Review",
   completed: "Completed",
+  archived: "Archived",
 };
 
 const REVIEWER_STATUS_ICON: Record<string, typeof Circle> = {
@@ -80,6 +93,8 @@ export default function RequestDetail({
   const [editCompleteBy, setEditCompleteBy] = useState<Date | undefined>();
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!request || !open) return;
@@ -90,7 +105,8 @@ export default function RequestDetail({
     setEditing(false);
   }, [request, open]);
 
-  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
+  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed" && request?.status !== "archived";
+  const canArchiveDelete = user?.id === request?.submitted_by || isAdmin;
 
   const enterEditMode = async () => {
     if (!request) return;
@@ -133,6 +149,40 @@ export default function RequestDetail({
       toast({ title: "Updated", description: "Review request updated successfully." });
       setEditing(false);
       onUpdated();
+    }
+  };
+
+  const archiveRequest = async () => {
+    if (!request) return;
+    setArchiving(true);
+    const { error } = await supabase
+      .from("review_requests")
+      .update({ status: "archived" as RequestStatus })
+      .eq("id", request.id);
+    setArchiving(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Archived", description: "Request has been archived." });
+      onUpdated();
+      onClose();
+    }
+  };
+
+  const deleteRequest = async () => {
+    if (!request) return;
+    setDeleting(true);
+    // Delete related data first
+    await supabase.from("review_statuses").delete().eq("request_id", request.id);
+    await supabase.from("request_notes").delete().eq("request_id", request.id);
+    const { error } = await supabase.from("review_requests").delete().eq("id", request.id);
+    setDeleting(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: "Request has been permanently deleted." });
+      onUpdated();
+      onClose();
     }
   };
 
@@ -538,6 +588,56 @@ export default function RequestDetail({
               </div>
             )}
           </div>
+
+          {/* Archive / Delete actions */}
+          {canArchiveDelete && request.status !== "archived" && (
+            <>
+              <Separator />
+              <div className="flex items-center gap-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10" disabled={archiving}>
+                      <Archive className="w-4 h-4 mr-1.5" />
+                      {archiving ? "Archiving…" : "Archive"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Archive this request?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will move the request to archived status. It will no longer appear in the default dashboard view.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={archiveRequest}>Archive</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" disabled={deleting}>
+                      <Trash2 className="w-4 h-4 mr-1.5" />
+                      {deleting ? "Deleting…" : "Delete"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this request permanently?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. The request, all reviewer statuses, and all notes will be permanently deleted.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteRequest} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </>
+          )}
         </div>
       </SheetContent>
     </Sheet>
