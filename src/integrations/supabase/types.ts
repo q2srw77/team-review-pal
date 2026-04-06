@@ -14,16 +14,133 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      request_notes: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          request_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          request_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_notes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "review_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_requests: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          status: Database["public"]["Enums"]["request_status"]
+          submitted_by: string
+          title: string
+          updated_at: string
+          url_location: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string
+          platform: Database["public"]["Enums"]["platform_type"]
+          status?: Database["public"]["Enums"]["request_status"]
+          submitted_by: string
+          title: string
+          updated_at?: string
+          url_location?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string
+          platform?: Database["public"]["Enums"]["platform_type"]
+          status?: Database["public"]["Enums"]["request_status"]
+          submitted_by?: string
+          title?: string
+          updated_at?: string
+          url_location?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "reviewer" | "submitter"
+      platform_type: "Storylane" | "Document" | "AI Project" | "MSP Project"
+      request_status: "pending" | "in_review" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +267,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "reviewer", "submitter"],
+      platform_type: ["Storylane", "Document", "AI Project", "MSP Project"],
+      request_status: ["pending", "in_review", "completed"],
+    },
   },
 } as const
