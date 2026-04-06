@@ -47,6 +47,7 @@ const ALL_ROLES: { value: AppRole; label: string }[] = [
 interface UserWithRoles {
   user_id: string;
   full_name: string;
+  email: string;
   roles: AppRole[];
   created_at: string;
 }
@@ -91,6 +92,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
       return {
         user_id: p.user_id,
         full_name: p.full_name,
+        email: (p as any).email ?? "",
         roles: userRoles.length > 0 ? userRoles : ["submitter" as AppRole],
         created_at: p.created_at,
       };
