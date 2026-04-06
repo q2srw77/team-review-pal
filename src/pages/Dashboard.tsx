@@ -157,9 +157,26 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Review Requests</h2>
-            <p className="text-sm text-muted-foreground mt-1">{requests.length} total requests</p>
+            <p className="text-sm text-muted-foreground mt-1">{requests.length} {view === "active" ? "active" : "archived"} requests</p>
           </div>
           <RequestForm onCreated={fetchRequests} />
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={view === "active" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("active")}
+          >
+            Active ({activeRequests.length})
+          </Button>
+          <Button
+            variant={view === "archived" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("archived")}
+          >
+            Archived ({archivedRequests.length})
+          </Button>
         </div>
 
         {requests.length === 0 ? (
