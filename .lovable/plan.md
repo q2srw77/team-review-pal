@@ -1,44 +1,42 @@
 
 
-## Settings Sidebar + Platform Management
-
-### Overview
-Add a sidebar navigation to the Settings page and a new "Platforms" section where admins can add, edit, and delete platforms that appear in the New Request dropdown.
+## Add Teams Section to Settings
 
 ### Database Changes
 
-**New table: `platforms`**
+**New table: `teams`**
 - `id` (uuid, PK, default gen_random_uuid())
-- `name` (text, unique, not null)
+- `name` (text, not null)
+- `description` (text, not null, default '')
 - `created_at` (timestamptz, default now())
 - RLS: SELECT for authenticated, ALL for admins
 
-**Migration: change `review_requests.platform` from enum to text**
-- `ALTER TABLE review_requests ALTER COLUMN platform TYPE text;`
-- Seed `platforms` table with existing enum values: Storylane, Document, AI Project, MSP Project
+**New table: `team_members`**
+- `id` (uuid, PK, default gen_random_uuid())
+- `team_id` (uuid, not null, FK to teams.id on delete cascade)
+- `user_id` (uuid, not null)
+- `created_at` (timestamptz, default now())
+- unique(team_id, user_id)
+- RLS: SELECT for authenticated, ALL for admins
 
 ### UI Changes
 
-**`src/pages/Settings.tsx`** — Add sidebar layout
-- Use the existing Sidebar component with two nav items: "Users" and "Platforms"
-- Wrap content in SidebarProvider with a collapsible sidebar on the left
-- Each nav item switches the active section in the main content area (local state, not routing)
+**`src/pages/Settings.tsx`**
+- Add "Teams" to the sidebar nav (using `UsersRound` icon)
+- Add section type and render `TeamManagement` component
 
-**New section: Platform Management** (inside Settings)
-- Table listing all platforms with name and created date
-- "Add Platform" button opens a dialog with a name input
-- Each row has edit and delete actions via dropdown menu
-- Delete shows confirmation dialog; prevents deletion if platform is in use (check `review_requests` table)
-
-**`src/components/RequestForm.tsx`**
-- Fetch platforms from the `platforms` table instead of using the hardcoded enum array
-- Render dynamically in the Select dropdown
+**New: `src/components/settings/TeamManagement.tsx`**
+- List view: table of teams showing name, description, member count, created date, and actions dropdown (Edit, Manage Members, Delete)
+- Add/Edit dialog: name + description fields
+- Delete confirmation dialog
+- Manage Members dialog: shows current members with remove button, plus a dropdown/select to add users from profiles table
+- Follows the same pattern as PlatformManagement (fetch, CRUD, dialogs, toasts)
 
 ### Files to modify/create
 
 | File | Change |
 |------|--------|
-| New migration | Create `platforms` table, alter `review_requests.platform` to text, seed data |
-| `src/pages/Settings.tsx` | Add sidebar layout with Users/Platforms sections; add platform CRUD UI |
-| `src/components/RequestForm.tsx` | Fetch platforms from DB instead of hardcoded array |
+| New migration | Create `teams` and `team_members` tables with RLS |
+| `src/components/settings/TeamManagement.tsx` | New component with full CRUD + member management |
+| `src/pages/Settings.tsx` | Add "Teams" nav item and render the component |
 
