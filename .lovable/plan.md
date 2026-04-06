@@ -1,23 +1,45 @@
 
 
-## Add Archive View to Dashboard
+## Auto-Delete Archived Requests After 6 Months
 
 ### Overview
-Add a toggle/tab on the Dashboard so all users can switch between active requests and their archived requests. Currently, archived requests are filtered out entirely (line 84).
+Automatically remove review requests that have been in "archived" status for more than 6 months using a scheduled database job.
 
-### Changes to `src/pages/Dashboard.tsx`
+### Approach
+Use a `pg_cron` job that runs daily to delete archived requests older than 6 months. This keeps it entirely in the database layer with no edge function needed.
 
-1. **Add view state**: `const [view, setView] = useState<"active" | "archived">("active")`
+### Database Changes
 
-2. **Update `fetchRequests`**: Store all fetched data (including archived) in a ref or separate state, then derive the displayed list based on view:
-   - `active` view: filter where `status !== "archived"` (current behavior)
-   - `archived` view: filter where `status === "archived"`
+1. **Add `archived_at` column** to `review_requests` via migration — tracks when a request was archived:
+   ```sql
+   ALTER TABLE public.review_requests ADD COLUMN archived_at timestamptz;
+   ```
 
-3. **Add toggle UI**: Between the heading and the table, add two tab-style buttons ("Active" / "Archived") using the existing `Button` component with variant toggling. Show request count for each view.
+2. **Create cleanup function** via migration:
+   ```sql
+   CREATE OR REPLACE FUNCTION public.cleanup_old_archived_requests()
+   RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+   AS $$ BEGIN
+     DELETE FROM public.review_requests
+     WHERE status = 'archived' AND archived_at < now() - interval '6 months';
+   END; $$;
+   ```
 
-4. **Visibility rules for non-admins in archived view**: Same as active -- only show requests they submitted, in their teams, or unassigned.
+3. **Schedule daily cron job** via the insert tool (not migration):
+   ```sql
+   SELECT cron.schedule('cleanup-archived-requests', '0 3 * * *',
+     $$SELECT public.cleanup_old_archived_requests()$$);
+   ```
 
-5. **Disable "New Request" button in archived view** (or keep it visible -- it makes sense to keep it always available).
+### Code Changes
 
-### Single file change: `src/pages/Dashboard.tsx`
+**`src/components/RequestDetail.tsx`** — In the `archiveRequest` function, set `archived_at: new Date().toISOString()` alongside `status: "archived"` in the update call.
+
+### Files to modify
+
+| File | Change |
+|------|--------|
+| New migration | Add `archived_at` column + cleanup function |
+| Insert query | Schedule daily cron job |
+| `src/components/RequestDetail.tsx` | Set `archived_at` when archiving |
 
