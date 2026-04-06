@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, ClipboardCheck, MoreHorizontal, Plus, UserPlus } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, MoreHorizontal, Pencil, Plus, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
