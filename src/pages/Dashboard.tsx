@@ -190,6 +190,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                           </a>
                         )}
                       </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
