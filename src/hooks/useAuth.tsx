@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]);
       const roleList = roles?.map((r) => r.role as AppRole) ?? [];
       setRoles(roleList);
-      setIsReviewer(roleList.includes("reviewer"));
+      setIsReviewer(roleList.includes("reviewer") || roleList.includes("admin"));
       setIsAdmin(roleList.includes("admin"));
       setProfileName(profile?.full_name ?? user.email ?? "");
       setLoading(false);
