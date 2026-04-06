@@ -303,6 +303,9 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setEditTarget(u); setEditForm({ full_name: u.full_name, email: u.email, password: "" }); }}>
+                                Edit User
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => { setRoleChangeTarget(u); setNewRoles(u.roles); }}>
                                 Change Roles
                               </DropdownMenuItem>
