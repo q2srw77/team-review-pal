@@ -33,6 +33,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
+  const [progressMap, setProgressMap] = useState<Map<string, { completed: number; total: number }>>(new Map());
 
   // Fetch teams lookup and user's team memberships
   useEffect(() => {
