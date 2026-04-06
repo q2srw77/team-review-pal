@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { action, user_id, roles } = await req.json();
+    const body = await req.json();
+    const { action, user_id } = body;
 
     if (!action || !user_id) {
       return new Response(JSON.stringify({ error: "action and user_id are required" }), {
@@ -65,6 +66,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "update_roles") {
+      const { roles } = body;
       const validRoles = ["admin", "reviewer", "submitter"];
       if (!roles || !Array.isArray(roles) || roles.length === 0) {
         return new Response(JSON.stringify({ error: "roles array is required" }), {
@@ -83,6 +85,61 @@ Deno.serve(async (req) => {
       await supabase.from("user_roles").insert(
         roles.map((r: string) => ({ user_id, role: r }))
       );
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "update_user") {
+      const { full_name, email, password } = body;
+
+      // Update auth user (email, password)
+      const authUpdate: Record<string, unknown> = {};
+      if (email && typeof email === "string" && email.trim()) {
+        authUpdate.email = email.trim();
+      }
+      if (password && typeof password === "string" && password.length >= 6) {
+        authUpdate.password = password;
+      }
+      if (password && typeof password === "string" && password.length > 0 && password.length < 6) {
+        return new Response(JSON.stringify({ error: "Password must be at least 6 characters" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (Object.keys(authUpdate).length > 0) {
+        const { error: authError } = await supabase.auth.admin.updateUserById(user_id, authUpdate);
+        if (authError) {
+          return new Response(JSON.stringify({ error: authError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
+      // Update profile (full_name, email)
+      const profileUpdate: Record<string, string> = {};
+      if (full_name && typeof full_name === "string" && full_name.trim()) {
+        profileUpdate.full_name = full_name.trim();
+      }
+      if (email && typeof email === "string" && email.trim()) {
+        profileUpdate.email = email.trim();
+      }
+
+      if (Object.keys(profileUpdate).length > 0) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update(profileUpdate)
+          .eq("user_id", user_id);
+        if (profileError) {
+          return new Response(JSON.stringify({ error: profileError.message }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

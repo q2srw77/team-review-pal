@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, ClipboardCheck, MoreHorizontal, Plus, UserPlus } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, MoreHorizontal, Pencil, Plus, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
@@ -68,6 +68,9 @@ export default function Settings({ onBack }: { onBack: () => void }) {
   const [deleteTarget, setDeleteTarget] = useState<UserWithRoles | null>(null);
   const [roleChangeTarget, setRoleChangeTarget] = useState<UserWithRoles | null>(null);
   const [newRoles, setNewRoles] = useState<AppRole[]>([]);
+  const [editTarget, setEditTarget] = useState<UserWithRoles | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", password: "" });
+  const [saving, setSaving] = useState(false);
 
   const [inviteForm, setInviteForm] = useState({
     full_name: "",
@@ -152,6 +155,40 @@ export default function Settings({ onBack }: { onBack: () => void }) {
       fetchUsers();
     }
     setRoleChangeTarget(null);
+  };
+
+  const handleEditUser = async () => {
+    if (!editTarget) return;
+    if (!editForm.full_name.trim()) {
+      toast({ title: "Name is required", variant: "destructive" });
+      return;
+    }
+    if (!editForm.email.trim()) {
+      toast({ title: "Email is required", variant: "destructive" });
+      return;
+    }
+    if (editForm.password && editForm.password.length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const body: Record<string, string> = {
+      action: "update_user",
+      user_id: editTarget.user_id,
+      full_name: editForm.full_name.trim(),
+      email: editForm.email.trim(),
+    };
+    if (editForm.password) body.password = editForm.password;
+    const { data, error } = await supabase.functions.invoke("manage-user", { body });
+    setSaving(false);
+
+    if (error || data?.error) {
+      toast({ title: data?.error || error?.message || "Failed to update user", variant: "destructive" });
+    } else {
+      toast({ title: "User updated" });
+      setEditTarget(null);
+      fetchUsers();
+    }
   };
 
   const handleDelete = async () => {
@@ -266,6 +303,9 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => { setEditTarget(u); setEditForm({ full_name: u.full_name, email: u.email, password: "" }); }}>
+                                Edit User
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => { setRoleChangeTarget(u); setNewRoles(u.roles); }}>
                                 Change Roles
                               </DropdownMenuItem>
@@ -349,6 +389,48 @@ export default function Settings({ onBack }: { onBack: () => void }) {
           <DialogFooter>
             <Button variant="outline" onClick={() => setRoleChangeTarget(null)}>Cancel</Button>
             <Button onClick={handleRoleChange}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => !o && setEditTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>Update details for {editTarget?.full_name}.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input
+                value={editForm.full_name}
+                onChange={(e) => setEditForm((f) => ({ ...f, full_name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>New Password (leave blank to keep current)</Label>
+              <Input
+                type="password"
+                value={editForm.password}
+                onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Min 6 characters"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button onClick={handleEditUser} disabled={saving}>
+              {saving ? "Saving..." : "Save"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
