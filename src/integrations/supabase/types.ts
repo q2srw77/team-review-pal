@@ -213,6 +213,7 @@ export type Database = {
       }
       review_requests: {
         Row: {
+          archived_at: string | null
           complete_by: string | null
           created_at: string
           id: string
@@ -227,6 +228,7 @@ export type Database = {
           url_location: string
         }
         Insert: {
+          archived_at?: string | null
           complete_by?: string | null
           created_at?: string
           id?: string
@@ -241,6 +243,7 @@ export type Database = {
           url_location?: string
         }
         Update: {
+          archived_at?: string | null
           complete_by?: string | null
           created_at?: string
           id?: string
@@ -393,6 +396,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_old_archived_requests: { Args: never; Returns: undefined }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean

@@ -165,7 +165,7 @@ export default function RequestDetail({
     setArchiving(true);
     const { error } = await supabase
       .from("review_requests")
-      .update({ status: "archived" as RequestStatus })
+      .update({ status: "archived" as RequestStatus, archived_at: new Date().toISOString() } as any)
       .eq("id", request.id);
     setArchiving(false);
     if (error) {
