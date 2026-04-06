@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, Users, Layers } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Users, Layers, UsersRound } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -15,11 +15,13 @@ import {
 } from "@/components/ui/sidebar";
 import UserManagement from "@/components/settings/UserManagement";
 import PlatformManagement from "@/components/settings/PlatformManagement";
+import TeamManagement from "@/components/settings/TeamManagement";
 
-type Section = "users" | "platforms";
+type Section = "users" | "platforms" | "teams";
 
 const NAV_ITEMS: { title: string; section: Section; icon: React.ElementType }[] = [
   { title: "Users", section: "users", icon: Users },
+  { title: "Teams", section: "teams", icon: UsersRound },
   { title: "Platforms", section: "platforms", icon: Layers },
 ];
 
@@ -69,6 +71,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
 
           <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 w-full">
             {active === "users" && <UserManagement />}
+            {active === "teams" && <TeamManagement />}
             {active === "platforms" && <PlatformManagement />}
           </main>
         </div>
