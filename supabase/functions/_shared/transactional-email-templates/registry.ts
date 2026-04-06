@@ -11,8 +11,10 @@ export interface TemplateEntry {
 
 import { template as newReviewRequest } from './new-review-request.tsx'
 import { template as reviewCompleted } from './review-completed.tsx'
+import { template as reviewAllComplete } from './review-all-complete.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'new-review-request': newReviewRequest,
   'review-completed': reviewCompleted,
+  'review-all-complete': reviewAllComplete,
 }

@@ -246,6 +246,41 @@ export default function RequestDetail({
     } else {
       fetchReviewerStatuses();
       onUpdated();
+
+      // Check if all reviewers are now completed and send instant notification
+      if (newStatus === "completed") {
+        const { data: allStatuses } = await supabase
+          .from("review_statuses")
+          .select("status")
+          .eq("request_id", request.id);
+
+        const allComplete = allStatuses && allStatuses.length > 0 && allStatuses.every((s) => s.status === "completed");
+
+        if (allComplete) {
+          // Fetch submitter email and team name for the notification
+          const [{ data: submitterProfile }, { data: team }] = await Promise.all([
+            supabase.from("profiles").select("email").eq("user_id", request.submitted_by).single(),
+            request.team_id
+              ? supabase.from("teams").select("name").eq("id", request.team_id).single()
+              : Promise.resolve({ data: null }),
+          ]);
+
+          if (submitterProfile?.email) {
+            await supabase.functions.invoke("send-transactional-email", {
+              body: {
+                templateName: "review-all-complete",
+                recipientEmail: submitterProfile.email,
+                idempotencyKey: `review-all-complete-${request.id}`,
+                templateData: {
+                  title: request.title,
+                  platform: request.platform,
+                  teamName: team?.name,
+                },
+              },
+            });
+          }
+        }
+      }
     }
   };
 
