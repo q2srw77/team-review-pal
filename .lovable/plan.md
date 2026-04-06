@@ -1,31 +1,40 @@
 
 
-## Multi-Role Selection for Users
+## Display All User Roles in Dashboard Header
 
-Currently each user has a single role. This change will allow users to have multiple roles (e.g. both `admin` and `reviewer`).
+### Changes
 
-### What changes
+**`src/hooks/useAuth.tsx`**
+- Add a `roles: AppRole[]` array to the auth context (derived from the `user_roles` query that already runs)
+- Export it alongside the existing `isReviewer`/`isAdmin` booleans
 
-The database schema already supports multiple roles per user (the `user_roles` table has a `unique(user_id, role)` constraint, not a single-role constraint). So no migration is needed -- just code changes.
+**`src/pages/Dashboard.tsx`**
+- Import `roles` from `useAuth`
+- Replace the single `{isReviewer && <Badge>Reviewer</Badge>}` with a loop over all roles, rendering a badge for each
 
-### Files to modify
+### Technical detail
 
-**`src/pages/Settings.tsx`**
-- Change `UserWithRole.role` from `AppRole` to `AppRole[]` (array)
-- `fetchUsers`: group all roles per user instead of picking the first one
-- Display multiple badges in the Role column
-- **Invite dialog**: replace the single Role `Select` with a checkbox group (admin, reviewer, submitter) allowing multi-select
-- **Change Role dialog**: replace single `Select` with checkbox group, pre-populated with current roles
-- Update `inviteForm.role` to `roles: AppRole[]`
+In `useAuth`, the `fetchUserData` effect already queries `user_roles`. Instead of only deriving booleans, also store the raw role strings:
 
-**`supabase/functions/invite-user/index.ts`**
-- Accept `roles` (array) instead of `role` (string)
-- Validate each role; insert multiple rows into `user_roles`
+```ts
+const roleList = roles?.map(r => r.role) ?? [];
+setUserRoles(roleList);
+setIsReviewer(roleList.includes("reviewer"));
+setIsAdmin(roleList.includes("admin"));
+```
 
-**`supabase/functions/manage-user/index.ts`**
-- `update_role` action: accept `roles` (array) instead of `role`
-- Delete existing roles, insert all new ones
+In Dashboard header, replace the single badge with:
+```tsx
+{roles.map(role => (
+  <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">
+    {role}
+  </Badge>
+))}
+```
 
-**`supabase/functions/setup-admin/index.ts`**
-- No change needed (already inserts both `admin` and `reviewer`)
+### Files modified
+| File | Change |
+|------|--------|
+| `src/hooks/useAuth.tsx` | Add `roles` array to context |
+| `src/pages/Dashboard.tsx` | Render all role badges |
 
