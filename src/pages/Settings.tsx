@@ -157,6 +157,40 @@ export default function Settings({ onBack }: { onBack: () => void }) {
     setRoleChangeTarget(null);
   };
 
+  const handleEditUser = async () => {
+    if (!editTarget) return;
+    if (!editForm.full_name.trim()) {
+      toast({ title: "Name is required", variant: "destructive" });
+      return;
+    }
+    if (!editForm.email.trim()) {
+      toast({ title: "Email is required", variant: "destructive" });
+      return;
+    }
+    if (editForm.password && editForm.password.length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const body: Record<string, string> = {
+      action: "update_user",
+      user_id: editTarget.user_id,
+      full_name: editForm.full_name.trim(),
+      email: editForm.email.trim(),
+    };
+    if (editForm.password) body.password = editForm.password;
+    const { data, error } = await supabase.functions.invoke("manage-user", { body });
+    setSaving(false);
+
+    if (error || data?.error) {
+      toast({ title: data?.error || error?.message || "Failed to update user", variant: "destructive" });
+    } else {
+      toast({ title: "User updated" });
+      setEditTarget(null);
+      fetchUsers();
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     const { data, error } = await supabase.functions.invoke("manage-user", {
