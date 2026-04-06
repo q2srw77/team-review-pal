@@ -186,6 +186,7 @@ export default function RequestDetail({
     }
   };
 
+  const fetchSubmitter = async () => {
     if (!request) return;
     const { data } = await supabase
       .from("profiles")
