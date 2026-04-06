@@ -45,7 +45,9 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
     setAttempted(true);
     if (!user || !title.trim() || !platform || !teamId || !completeBy || !notes.trim()) return;
     setSubmitting(true);
+    const requestId = crypto.randomUUID();
     const { error } = await supabase.from("review_requests").insert({
+      id: requestId,
       title: title.trim(),
       platform: platform,
       url_location: urlLocation.trim() || null,
@@ -54,15 +56,53 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
       team_id: teamId || null,
       complete_by: completeBy ? format(completeBy, "yyyy-MM-dd") : null,
     });
-    setSubmitting(false);
     if (error) {
+      setSubmitting(false);
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Request submitted" });
-      reset();
-      setOpen(false);
-      onCreated();
+      return;
     }
+    // Send email notifications to team members
+    try {
+      const { data: members } = await supabase
+        .from("team_members")
+        .select("user_id, profiles:user_id(email, full_name)")
+        .eq("team_id", teamId);
+      const teamName = teams.find((t) => t.id === teamId)?.name || "";
+      const { data: submitterProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (members) {
+        for (const member of members) {
+          if (member.user_id === user.id) continue;
+          const profile = member.profiles as any;
+          if (!profile?.email) continue;
+          supabase.functions.invoke("send-transactional-email", {
+            body: {
+              templateName: "new-review-request",
+              recipientEmail: profile.email,
+              idempotencyKey: `review-notify-${requestId}-${member.user_id}`,
+              templateData: {
+                title: title.trim(),
+                platform,
+                teamName,
+                submitterName: submitterProfile?.full_name || user.email,
+                completeBy: completeBy ? format(completeBy, "PPP") : undefined,
+                appUrl: window.location.origin,
+              },
+            },
+          });
+        }
+      }
+    } catch (emailErr) {
+      console.error("Failed to send notifications:", emailErr);
+    }
+    setSubmitting(false);
+    toast({ title: "Request submitted" });
+    reset();
+    setOpen(false);
+    onCreated();
   };
 
   const RequiredStar = () => <span className="text-destructive ml-0.5">*</span>;
