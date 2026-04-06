@@ -49,10 +49,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { email, password, full_name, role } = await req.json();
+    const { email, password, full_name, roles } = await req.json();
 
-    if (!email || !password || !full_name || !role) {
-      return new Response(JSON.stringify({ error: "All fields are required" }), {
+    if (!email || !password || !full_name || !roles || !Array.isArray(roles) || roles.length === 0) {
+      return new Response(JSON.stringify({ error: "All fields are required (roles must be a non-empty array)" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     }
 
     const validRoles = ["admin", "reviewer", "submitter"];
-    if (!validRoles.includes(role)) {
+    if (!roles.every((r: string) => validRoles.includes(r))) {
       return new Response(JSON.stringify({ error: "Invalid role" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -88,11 +88,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Assign role
-    await supabase.from("user_roles").insert({
-      user_id: newUser.user.id,
-      role,
-    });
+    // Assign roles
+    await supabase.from("user_roles").insert(
+      roles.map((r: string) => ({ user_id: newUser.user.id, role: r }))
+    );
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

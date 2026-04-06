@@ -66,18 +66,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (action === "update_role") {
+    if (action === "update_roles") {
       const validRoles = ["admin", "reviewer", "submitter"];
-      if (!role || !validRoles.includes(role)) {
+      const { roles } = await req.json().catch(() => ({}));
+      // roles already parsed above via destructuring; re-read from body
+      if (!role && (!roles || !Array.isArray(roles) || roles.length === 0)) {
+        return new Response(JSON.stringify({ error: "roles array is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const roleList = roles || [role];
+      if (!roleList.every((r: string) => validRoles.includes(r))) {
         return new Response(JSON.stringify({ error: "Invalid role" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Delete existing roles and insert new one
+      // Delete existing roles and insert new ones
       await supabase.from("user_roles").delete().eq("user_id", user_id);
-      await supabase.from("user_roles").insert({ user_id, role });
+      await supabase.from("user_roles").insert(
+        roleList.map((r: string) => ({ user_id, role: r }))
+      );
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
