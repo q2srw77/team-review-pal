@@ -41,12 +41,12 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !platform) return;
+    if (!user || !platform || !teamId) return;
     setSubmitting(true);
     const { error } = await supabase.from("review_requests").insert({
       title: title.trim(),
       platform: platform,
-      url_location: urlLocation.trim(),
+      url_location: urlLocation.trim() || null,
       notes: notes.trim(),
       submitted_by: user.id,
       team_id: teamId || null,
@@ -97,7 +97,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
           </div>
           <div className="space-y-2">
             <Label htmlFor="url">URL Location</Label>
-            <Input id="url" required value={urlLocation} onChange={(e) => setUrlLocation(e.target.value)} placeholder="https://..." maxLength={500} />
+            <Input id="url" value={urlLocation} onChange={(e) => setUrlLocation(e.target.value)} placeholder="https://..." maxLength={500} />
           </div>
           <div className="space-y-2">
             <Label>Complete By</Label>
@@ -119,7 +119,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={submitting || !platform}>{submitting ? "Submitting…" : "Submit"}</Button>
+            <Button type="submit" disabled={submitting || !platform || !teamId}>{submitting ? "Submitting…" : "Submit"}</Button>
           </div>
         </form>
       </DialogContent>
