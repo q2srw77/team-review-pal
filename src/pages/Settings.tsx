@@ -77,7 +77,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
 
   const fetchUsers = useCallback(async () => {
     const [{ data: profiles }, { data: roles }] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, created_at"),
+      supabase.from("profiles").select("user_id, full_name, email, created_at"),
       supabase.from("user_roles").select("user_id, role"),
     ]);
 
