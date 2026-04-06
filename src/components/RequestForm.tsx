@@ -103,7 +103,7 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
             {attempted && !teamId && <p className="text-sm text-destructive">Team is required</p>}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="url">URL Location</Label>
+            <Label htmlFor="url">URL</Label>
             <Input id="url" value={urlLocation} onChange={(e) => setUrlLocation(e.target.value)} placeholder="https://..." maxLength={500} />
           </div>
           <div className="space-y-2">
