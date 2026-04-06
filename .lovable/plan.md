@@ -1,42 +1,26 @@
 
 
-## Add Teams Section to Settings
+## Add Team Dropdown and Complete By Date to Review Request Form
 
 ### Database Changes
 
-**New table: `teams`**
-- `id` (uuid, PK, default gen_random_uuid())
-- `name` (text, not null)
-- `description` (text, not null, default '')
-- `created_at` (timestamptz, default now())
-- RLS: SELECT for authenticated, ALL for admins
-
-**New table: `team_members`**
-- `id` (uuid, PK, default gen_random_uuid())
-- `team_id` (uuid, not null, FK to teams.id on delete cascade)
-- `user_id` (uuid, not null)
-- `created_at` (timestamptz, default now())
-- unique(team_id, user_id)
-- RLS: SELECT for authenticated, ALL for admins
+**Migration: Add two columns to `review_requests`**
+- `team_id` (uuid, nullable, FK to teams.id on delete set null)
+- `complete_by` (date, nullable)
 
 ### UI Changes
 
-**`src/pages/Settings.tsx`**
-- Add "Teams" to the sidebar nav (using `UsersRound` icon)
-- Add section type and render `TeamManagement` component
+**`src/components/RequestForm.tsx`**
+- Fetch teams from the `teams` table (same pattern as platforms fetch)
+- Add a "Team" Select dropdown after the Platform field
+- Add a "Complete By" date picker using the Popover + Calendar pattern after the URL field
+- Include `team_id` and `complete_by` in the insert payload
+- Reset both new fields in the `reset()` function
 
-**New: `src/components/settings/TeamManagement.tsx`**
-- List view: table of teams showing name, description, member count, created date, and actions dropdown (Edit, Manage Members, Delete)
-- Add/Edit dialog: name + description fields
-- Delete confirmation dialog
-- Manage Members dialog: shows current members with remove button, plus a dropdown/select to add users from profiles table
-- Follows the same pattern as PlatformManagement (fetch, CRUD, dialogs, toasts)
-
-### Files to modify/create
+### Files to modify
 
 | File | Change |
 |------|--------|
-| New migration | Create `teams` and `team_members` tables with RLS |
-| `src/components/settings/TeamManagement.tsx` | New component with full CRUD + member management |
-| `src/pages/Settings.tsx` | Add "Teams" nav item and render the component |
+| New migration | Add `team_id` and `complete_by` columns to `review_requests` |
+| `src/components/RequestForm.tsx` | Add Team dropdown and Complete By date picker |
 
