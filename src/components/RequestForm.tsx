@@ -7,8 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Plus, CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function RequestForm({ onCreated }: { onCreated: () => void }) {
   const { user } = useAuth();
@@ -18,16 +22,22 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
   const [platform, setPlatform] = useState("");
   const [urlLocation, setUrlLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [teamId, setTeamId] = useState("");
+  const [completeBy, setCompleteBy] = useState<Date | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
+  const [teams, setTeams] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     supabase.from("platforms").select("id, name").order("name").then(({ data }) => {
       if (data) setPlatforms(data);
     });
+    supabase.from("teams").select("id, name").order("name").then(({ data }) => {
+      if (data) setTeams(data);
+    });
   }, [open]);
 
-  const reset = () => { setTitle(""); setPlatform(""); setUrlLocation(""); setNotes(""); };
+  const reset = () => { setTitle(""); setPlatform(""); setUrlLocation(""); setNotes(""); setTeamId(""); setCompleteBy(undefined); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +49,8 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
       url_location: urlLocation.trim(),
       notes: notes.trim(),
       submitted_by: user.id,
+      team_id: teamId || null,
+      complete_by: completeBy ? format(completeBy, "yyyy-MM-dd") : null,
     });
     setSubmitting(false);
     if (error) {
@@ -75,8 +87,31 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
             </Select>
           </div>
           <div className="space-y-2">
+            <Label>Team</Label>
+            <Select value={teamId} onValueChange={setTeamId}>
+              <SelectTrigger><SelectValue placeholder="Select team (optional)" /></SelectTrigger>
+              <SelectContent>
+                {teams.map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="url">URL Location</Label>
             <Input id="url" required value={urlLocation} onChange={(e) => setUrlLocation(e.target.value)} placeholder="https://..." maxLength={500} />
+          </div>
+          <div className="space-y-2">
+            <Label>Complete By</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !completeBy && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {completeBy ? format(completeBy, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={completeBy} onSelect={setCompleteBy} initialFocus className={cn("p-3 pointer-events-auto")} />
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
