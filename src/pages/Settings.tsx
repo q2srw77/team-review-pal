@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -14,13 +15,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,11 +38,16 @@ import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
-interface UserWithRole {
+const ALL_ROLES: { value: AppRole; label: string }[] = [
+  { value: "admin", label: "Admin" },
+  { value: "reviewer", label: "Reviewer" },
+  { value: "submitter", label: "Submitter" },
+];
+
+interface UserWithRoles {
   user_id: string;
   full_name: string;
-  email: string;
-  role: AppRole;
+  roles: AppRole[];
   created_at: string;
 }
 
@@ -61,24 +60,22 @@ const ROLE_STYLES: Record<AppRole, string> = {
 export default function Settings({ onBack }: { onBack: () => void }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<UserWithRole | null>(null);
-  const [roleChangeTarget, setRoleChangeTarget] = useState<UserWithRole | null>(null);
-  const [newRole, setNewRole] = useState<AppRole>("submitter");
+  const [deleteTarget, setDeleteTarget] = useState<UserWithRoles | null>(null);
+  const [roleChangeTarget, setRoleChangeTarget] = useState<UserWithRoles | null>(null);
+  const [newRoles, setNewRoles] = useState<AppRole[]>([]);
 
-  // Invite form state
   const [inviteForm, setInviteForm] = useState({
     full_name: "",
     email: "",
     password: "",
-    role: "submitter" as AppRole,
+    roles: [] as AppRole[],
   });
 
   const fetchUsers = useCallback(async () => {
-    // Get profiles + roles
     const [{ data: profiles }, { data: roles }] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name, created_at"),
       supabase.from("user_roles").select("user_id, role"),
@@ -89,13 +86,12 @@ export default function Settings({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    const userList: UserWithRole[] = profiles.map((p) => {
-      const userRole = roles?.find((r) => r.user_id === p.user_id);
+    const userList: UserWithRoles[] = profiles.map((p) => {
+      const userRoles = roles?.filter((r) => r.user_id === p.user_id).map((r) => r.role as AppRole) ?? [];
       return {
         user_id: p.user_id,
         full_name: p.full_name,
-        email: "", // We'll show name; email not in profiles
-        role: (userRole?.role as AppRole) ?? "submitter",
+        roles: userRoles.length > 0 ? userRoles : ["submitter" as AppRole],
         created_at: p.created_at,
       };
     });
@@ -108,9 +104,17 @@ export default function Settings({ onBack }: { onBack: () => void }) {
     fetchUsers();
   }, [fetchUsers]);
 
+  const toggleRole = (current: AppRole[], role: AppRole): AppRole[] => {
+    return current.includes(role) ? current.filter((r) => r !== role) : [...current, role];
+  };
+
   const handleInvite = async () => {
     if (!inviteForm.email || !inviteForm.password || !inviteForm.full_name) {
       toast({ title: "All fields are required", variant: "destructive" });
+      return;
+    }
+    if (inviteForm.roles.length === 0) {
+      toast({ title: "Select at least one role", variant: "destructive" });
       return;
     }
     setInviting(true);
@@ -126,20 +130,23 @@ export default function Settings({ onBack }: { onBack: () => void }) {
 
     toast({ title: "User invited successfully" });
     setInviteOpen(false);
-    setInviteForm({ full_name: "", email: "", password: "", role: "submitter" });
+    setInviteForm({ full_name: "", email: "", password: "", roles: [] });
     fetchUsers();
   };
 
   const handleRoleChange = async () => {
-    if (!roleChangeTarget) return;
+    if (!roleChangeTarget || newRoles.length === 0) {
+      toast({ title: "Select at least one role", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.functions.invoke("manage-user", {
-      body: { action: "update_role", user_id: roleChangeTarget.user_id, role: newRole },
+      body: { action: "update_roles", user_id: roleChangeTarget.user_id, roles: newRoles },
     });
 
     if (error || data?.error) {
-      toast({ title: data?.error || error?.message || "Failed to update role", variant: "destructive" });
+      toast({ title: data?.error || error?.message || "Failed to update roles", variant: "destructive" });
     } else {
-      toast({ title: "Role updated" });
+      toast({ title: "Roles updated" });
       fetchUsers();
     }
     setRoleChangeTarget(null);
@@ -160,9 +167,28 @@ export default function Settings({ onBack }: { onBack: () => void }) {
     setDeleteTarget(null);
   };
 
+  const RoleCheckboxGroup = ({
+    selected,
+    onChange,
+  }: {
+    selected: AppRole[];
+    onChange: (roles: AppRole[]) => void;
+  }) => (
+    <div className="space-y-3">
+      {ALL_ROLES.map((r) => (
+        <label key={r.value} className="flex items-center gap-2 cursor-pointer">
+          <Checkbox
+            checked={selected.includes(r.value)}
+            onCheckedChange={() => onChange(toggleRole(selected, r.value))}
+          />
+          <span className="text-sm font-medium">{r.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-30 bg-card border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -205,7 +231,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                 <thead>
                   <tr className="border-b border-border bg-secondary/40">
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
-                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Role</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground">Roles</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Joined</th>
                     <th className="py-3 px-4 w-10"></th>
                   </tr>
@@ -217,9 +243,13 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                         <div className="font-medium text-foreground">{u.full_name}</div>
                       </td>
                       <td className="py-3 px-4">
-                        <Badge variant="outline" className={ROLE_STYLES[u.role]}>
-                          {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {u.roles.map((role) => (
+                            <Badge key={role} variant="outline" className={ROLE_STYLES[role]}>
+                              {role.charAt(0).toUpperCase() + role.slice(1)}
+                            </Badge>
+                          ))}
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
                         {format(new Date(u.created_at), "MMM d, yyyy")}
@@ -233,8 +263,8 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => { setRoleChangeTarget(u); setNewRole(u.role); }}>
-                                Change Role
+                              <DropdownMenuItem onClick={() => { setRoleChangeTarget(u); setNewRoles(u.roles); }}>
+                                Change Roles
                               </DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(u)}>
                                 Remove User
@@ -287,17 +317,11 @@ export default function Settings({ onBack }: { onBack: () => void }) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Role</Label>
-              <Select value={inviteForm.role} onValueChange={(v) => setInviteForm((f) => ({ ...f, role: v as AppRole }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="reviewer">Reviewer</SelectItem>
-                  <SelectItem value="submitter">Submitter</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Roles</Label>
+              <RoleCheckboxGroup
+                selected={inviteForm.roles}
+                onChange={(roles) => setInviteForm((f) => ({ ...f, roles }))}
+              />
             </div>
           </div>
           <DialogFooter>
@@ -313,20 +337,11 @@ export default function Settings({ onBack }: { onBack: () => void }) {
       <Dialog open={!!roleChangeTarget} onOpenChange={(o) => !o && setRoleChangeTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Change Role</DialogTitle>
-            <DialogDescription>Update role for {roleChangeTarget?.full_name}.</DialogDescription>
+            <DialogTitle>Change Roles</DialogTitle>
+            <DialogDescription>Update roles for {roleChangeTarget?.full_name}.</DialogDescription>
           </DialogHeader>
           <div className="py-2">
-            <Select value={newRole} onValueChange={(v) => setNewRole(v as AppRole)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="reviewer">Reviewer</SelectItem>
-                <SelectItem value="submitter">Submitter</SelectItem>
-              </SelectContent>
-            </Select>
+            <RoleCheckboxGroup selected={newRoles} onChange={setNewRoles} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRoleChangeTarget(null)}>Cancel</Button>

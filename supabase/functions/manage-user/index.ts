@@ -24,7 +24,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Verify caller is admin
     const anonClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -49,7 +48,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { action, user_id, role } = await req.json();
+    const { action, user_id, roles } = await req.json();
 
     if (!action || !user_id) {
       return new Response(JSON.stringify({ error: "action and user_id are required" }), {
@@ -58,7 +57,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Prevent self-modification
     if (user_id === caller.id) {
       return new Response(JSON.stringify({ error: "Cannot modify your own account" }), {
         status: 400,
@@ -66,18 +64,25 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (action === "update_role") {
+    if (action === "update_roles") {
       const validRoles = ["admin", "reviewer", "submitter"];
-      if (!role || !validRoles.includes(role)) {
+      if (!roles || !Array.isArray(roles) || roles.length === 0) {
+        return new Response(JSON.stringify({ error: "roles array is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!roles.every((r: string) => validRoles.includes(r))) {
         return new Response(JSON.stringify({ error: "Invalid role" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Delete existing roles and insert new one
       await supabase.from("user_roles").delete().eq("user_id", user_id);
-      await supabase.from("user_roles").insert({ user_id, role });
+      await supabase.from("user_roles").insert(
+        roles.map((r: string) => ({ user_id, role: r }))
+      );
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -85,9 +90,7 @@ Deno.serve(async (req) => {
     }
 
     if (action === "delete_user") {
-      // Delete roles first
       await supabase.from("user_roles").delete().eq("user_id", user_id);
-      // Delete user via admin API
       const { error } = await supabase.auth.admin.deleteUser(user_id);
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
