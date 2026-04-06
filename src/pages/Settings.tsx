@@ -47,6 +47,7 @@ const ALL_ROLES: { value: AppRole; label: string }[] = [
 interface UserWithRoles {
   user_id: string;
   full_name: string;
+  email: string;
   roles: AppRole[];
   created_at: string;
 }
@@ -77,7 +78,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
 
   const fetchUsers = useCallback(async () => {
     const [{ data: profiles }, { data: roles }] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, created_at"),
+      supabase.from("profiles").select("user_id, full_name, email, created_at"),
       supabase.from("user_roles").select("user_id, role"),
     ]);
 
@@ -91,6 +92,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
       return {
         user_id: p.user_id,
         full_name: p.full_name,
+        email: (p as any).email ?? "",
         roles: userRoles.length > 0 ? userRoles : ["submitter" as AppRole],
         created_at: p.created_at,
       };
@@ -241,6 +243,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
                     <tr key={u.user_id} className="border-b border-border/60 last:border-0 hover:bg-secondary/30 transition-colors">
                       <td className="py-3 px-4">
                         <div className="font-medium text-foreground">{u.full_name}</div>
+                        <div className="text-xs text-muted-foreground">{u.email}</div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1">
