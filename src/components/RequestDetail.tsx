@@ -62,7 +62,7 @@ export default function RequestDetail({
   onClose: () => void;
   onUpdated: () => void;
 }) {
-  const { isReviewer, user } = useAuth();
+  const { isReviewer, isAdmin, user } = useAuth();
   const { toast } = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
@@ -452,11 +452,16 @@ export default function RequestDetail({
           <Separator />
 
           {/* Reviewer Progress */}
-          {reviewerStatuses.length > 0 && (
+      {reviewerStatuses.length > 0 && (() => {
+            const isSubmitter = user?.id === request.submitted_by;
+            const visibleStatuses = (isSubmitter || isAdmin)
+              ? reviewerStatuses
+              : reviewerStatuses.filter((rs) => rs.reviewer_id === user?.id);
+            return visibleStatuses.length > 0 ? (
             <div>
               <h3 className="font-semibold text-sm mb-3">Reviewer Progress</h3>
               <div className="space-y-2">
-                {reviewerStatuses.map((rs) => {
+                {visibleStatuses.map((rs) => {
                   const Icon = REVIEWER_STATUS_ICON[rs.status] ?? Circle;
                   const isMe = rs.reviewer_id === user?.id;
                   return (
@@ -494,7 +499,8 @@ export default function RequestDetail({
                 })}
               </div>
             </div>
-          )}
+          ) : null;
+          })()}
 
           <Separator />
 
