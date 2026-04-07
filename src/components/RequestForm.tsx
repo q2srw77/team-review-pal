@@ -65,34 +65,47 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
     try {
       const { data: members } = await supabase
         .from("team_members")
-        .select("user_id, profiles:user_id(email, full_name)")
+        .select("user_id")
         .eq("team_id", teamId);
-      const teamName = teams.find((t) => t.id === teamId)?.name || "";
-      const { data: submitterProfile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (members) {
-        for (const member of members) {
-          if (member.user_id === user.id) continue;
-          const profile = member.profiles as any;
-          if (!profile?.email) continue;
-          supabase.functions.invoke("send-transactional-email", {
-            body: {
-              templateName: "new-review-request",
-              recipientEmail: profile.email,
-              idempotencyKey: `review-notify-${requestId}-${member.user_id}`,
-              templateData: {
-                title: title.trim(),
-                platform,
-                teamName,
-                submitterName: submitterProfile?.full_name || user.email,
-                completeBy: completeBy ? format(completeBy, "PPP") : undefined,
-                appUrl: window.location.origin,
-              },
-            },
-          });
+
+      if (members && members.length > 0) {
+        const otherMemberIds = members
+          .filter((m) => m.user_id !== user.id)
+          .map((m) => m.user_id);
+
+        if (otherMemberIds.length > 0) {
+          const { data: memberProfiles } = await supabase
+            .from("profiles")
+            .select("user_id, email, full_name")
+            .in("user_id", otherMemberIds);
+
+          const teamName = teams.find((t) => t.id === teamId)?.name || "";
+          const { data: submitterProfile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+          if (memberProfiles) {
+            for (const profile of memberProfiles) {
+              if (!profile.email) continue;
+              supabase.functions.invoke("send-transactional-email", {
+                body: {
+                  templateName: "new-review-request",
+                  recipientEmail: profile.email,
+                  idempotencyKey: `review-notify-${requestId}-${profile.user_id}`,
+                  templateData: {
+                    title: title.trim(),
+                    platform,
+                    teamName,
+                    submitterName: submitterProfile?.full_name || user.email,
+                    completeBy: completeBy ? format(completeBy, "PPP") : undefined,
+                    appUrl: window.location.origin,
+                  },
+                },
+              });
+            }
+          }
         }
       }
     } catch (emailErr) {
