@@ -27,7 +27,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 };
 
 export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?: () => void }) {
-  const { user, signOut, isAdmin, roles, profileName } = useAuth();
+  const { user, signOut, isAdmin, roles, profileName, loading } = useAuth();
   const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
   const [view, setView] = useState<"active" | "completed">("active");
@@ -117,8 +117,8 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
   }, [user, isAdmin, userTeamIds, selected]);
 
   useEffect(() => {
-    if (user) fetchRequests();
-  }, [user, userTeamIds]);
+    if (user && !loading) fetchRequests();
+  }, [user, userTeamIds, isAdmin, loading]);
 
   const openDetail = (r: ReviewRequest) => {
     setSelected(r);
