@@ -64,6 +64,7 @@ export default function TeamManagement() {
   const [members, setMembers] = useState<(TeamMember & { profile?: Profile })[]>([]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [memberSearch, setMemberSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(false);
 
   const fetchTeams = useCallback(async () => {
@@ -141,6 +142,7 @@ export default function TeamManagement() {
     );
     setAllProfiles(profiles ?? []);
     setSelectedUserIds([]);
+    setMemberSearch("");
     setMembersLoading(false);
   };
 
@@ -171,6 +173,11 @@ export default function TeamManagement() {
 
   const existingUserIds = new Set(members.map((m) => m.user_id));
   const availableProfiles = allProfiles.filter((p) => !existingUserIds.has(p.user_id));
+  const filteredProfiles = availableProfiles.filter((p) => {
+    if (!memberSearch.trim()) return true;
+    const q = memberSearch.toLowerCase();
+    return p.full_name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q);
+  });
 
   return (
     <div>
@@ -304,20 +311,30 @@ export default function TeamManagement() {
               {/* Add member */}
               {availableProfiles.length > 0 ? (
                 <>
+                  <Input
+                    placeholder="Search users..."
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    className="mb-2"
+                  />
                   <div className="border rounded-md max-h-40 overflow-y-auto p-2 space-y-1">
-                    {availableProfiles.map((p) => (
-                      <label key={p.user_id} className="flex items-center gap-2 p-1.5 rounded hover:bg-accent cursor-pointer text-sm">
-                        <Checkbox
-                          checked={selectedUserIds.includes(p.user_id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedUserIds(prev =>
-                              checked ? [...prev, p.user_id] : prev.filter(id => id !== p.user_id)
-                            );
-                          }}
-                        />
-                        <span>{p.full_name || p.email}</span>
-                      </label>
-                    ))}
+                    {filteredProfiles.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-1.5">No matching users.</p>
+                    ) : (
+                      filteredProfiles.map((p) => (
+                        <label key={p.user_id} className="flex items-center gap-2 p-1.5 rounded hover:bg-accent cursor-pointer text-sm">
+                          <Checkbox
+                            checked={selectedUserIds.includes(p.user_id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedUserIds(prev =>
+                                checked ? [...prev, p.user_id] : prev.filter(id => id !== p.user_id)
+                              );
+                            }}
+                          />
+                          <span>{p.full_name || p.email}</span>
+                        </label>
+                      ))
+                    )}
                   </div>
                   <Button onClick={addMember} disabled={selectedUserIds.length === 0} size="sm">
                     Add ({selectedUserIds.length})
