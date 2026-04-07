@@ -1,19 +1,33 @@
 
 
-## Add "Completed" Filter Tab to Dashboard
+## Fix Function Search Path Mutable Warning
 
-### Change in `src/pages/Dashboard.tsx`
+### Problem
+Four database functions in the `public` schema lack a `SET search_path` configuration, which the Supabase linter flags as a security risk. Without an explicit search path, these functions could be exploited via schema injection.
 
-1. **Update view state type** (line 37): Change from `"active" | "archived"` to `"active" | "completed" | "archived"`.
+### Affected Functions
+- `enqueue_email`
+- `read_email_batch`
+- `delete_email`
+- `move_to_dlq`
 
-2. **Update filter logic** (lines 107-108): Split into three groups:
-   - `active`: status is `pending` or `in_review`
-   - `completed`: status is `completed`
-   - `archived`: status is `archived`
+### Fix
+One database migration that re-creates all four functions with `SET search_path TO 'public'` added:
 
-3. **Add third button** (lines 124-134): Insert a "Completed" button between Active and Archived with the count.
+```sql
+CREATE OR REPLACE FUNCTION public.enqueue_email(queue_name TEXT, payload JSONB)
+RETURNS BIGINT LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
 
-4. **Update count label** (line 119): Handle the new "completed" view label.
+CREATE OR REPLACE FUNCTION public.read_email_batch(queue_name TEXT, batch_size INT, vt INT)
+RETURNS SETOF pgmq.message LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
 
-### Single file: `src/pages/Dashboard.tsx`
+CREATE OR REPLACE FUNCTION public.delete_email(queue_name TEXT, message_id BIGINT)
+RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
+
+CREATE OR REPLACE FUNCTION public.move_to_dlq(source_queue TEXT, dead_letter_queue TEXT, message_id BIGINT)
+RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
+```
+
+### Scope
+- **1 new migration file** — no application code changes needed.
 
