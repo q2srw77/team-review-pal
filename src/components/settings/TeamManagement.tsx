@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,9 +18,6 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
@@ -65,7 +63,7 @@ export default function TeamManagement() {
   const [membersTarget, setMembersTarget] = useState<Team | null>(null);
   const [members, setMembers] = useState<(TeamMember & { profile?: Profile })[]>([]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
   const fetchTeams = useCallback(async () => {
@@ -142,18 +140,19 @@ export default function TeamManagement() {
       (teamMembers ?? []).map((m) => ({ ...m, profile: profileMap.get(m.user_id) }))
     );
     setAllProfiles(profiles ?? []);
-    setSelectedUserId("");
+    setSelectedUserIds([]);
     setMembersLoading(false);
   };
 
   const addMember = async () => {
-    if (!membersTarget || !selectedUserId) return;
-    const { error } = await supabase.from("team_members").insert({ team_id: membersTarget.id, user_id: selectedUserId });
+    if (!membersTarget || selectedUserIds.length === 0) return;
+    const rows = selectedUserIds.map(uid => ({ team_id: membersTarget.id, user_id: uid }));
+    const { error } = await supabase.from("team_members").insert(rows);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Member added" });
+    toast({ title: `${selectedUserIds.length} member(s) added` });
     openMembers(membersTarget);
     fetchTeams();
   };
@@ -303,21 +302,30 @@ export default function TeamManagement() {
           ) : (
             <>
               {/* Add member */}
-              <div className="flex gap-2">
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select a user to add" />
-                  </SelectTrigger>
-                  <SelectContent>
+              {availableProfiles.length > 0 ? (
+                <>
+                  <div className="border rounded-md max-h-40 overflow-y-auto p-2 space-y-1">
                     {availableProfiles.map((p) => (
-                      <SelectItem key={p.user_id} value={p.user_id}>
-                        {p.full_name || p.email}
-                      </SelectItem>
+                      <label key={p.user_id} className="flex items-center gap-2 p-1.5 rounded hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox
+                          checked={selectedUserIds.includes(p.user_id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedUserIds(prev =>
+                              checked ? [...prev, p.user_id] : prev.filter(id => id !== p.user_id)
+                            );
+                          }}
+                        />
+                        <span>{p.full_name || p.email}</span>
+                      </label>
                     ))}
-                  </SelectContent>
-                </Select>
-                <Button onClick={addMember} disabled={!selectedUserId} size="sm">Add</Button>
-              </div>
+                  </div>
+                  <Button onClick={addMember} disabled={selectedUserIds.length === 0} size="sm">
+                    Add ({selectedUserIds.length})
+                  </Button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">All users are already members.</p>
+              )}
 
               {/* Current members */}
               {members.length === 0 ? (
