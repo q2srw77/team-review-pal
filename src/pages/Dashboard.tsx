@@ -18,21 +18,19 @@ const STATUS_STYLES: Record<RequestStatus, string> = {
   pending: "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.3)]",
   in_review: "bg-[hsl(var(--status-in-review)/0.15)] text-[hsl(var(--status-in-review))] border-[hsl(var(--status-in-review)/0.3)]",
   completed: "bg-[hsl(var(--status-completed)/0.15)] text-[hsl(var(--status-completed))] border-[hsl(var(--status-completed)/0.3)]",
-  archived: "bg-muted text-muted-foreground border-muted-foreground/30",
 };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   pending: "Pending",
   in_review: "In Review",
   completed: "Completed",
-  archived: "Archived",
 };
 
 export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?: () => void }) {
   const { user, signOut, isAdmin, roles, profileName } = useAuth();
   const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
-  const [view, setView] = useState<"active" | "completed" | "archived">("active");
+  const [view, setView] = useState<"active" | "completed">("active");
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
@@ -129,8 +127,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
 
   const activeRequests = allRequests.filter((r) => r.status === "pending" || r.status === "in_review");
   const completedRequests = allRequests.filter((r) => r.status === "completed");
-  const archivedRequests = allRequests.filter((r) => r.status === "archived");
-  const requests = view === "active" ? activeRequests : view === "completed" ? completedRequests : archivedRequests;
+  const requests = view === "active" ? activeRequests : completedRequests;
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,13 +177,6 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
             onClick={() => setView("completed")}
           >
             Completed ({completedRequests.length})
-          </Button>
-          <Button
-            variant={view === "archived" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setView("archived")}
-          >
-            Archived ({archivedRequests.length})
           </Button>
         </div>
 
