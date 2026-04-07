@@ -32,7 +32,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
   const { user, signOut, isAdmin, roles, profileName } = useAuth();
   const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
-  const [view, setView] = useState<"active" | "archived">("active");
+  const [view, setView] = useState<"active" | "completed" | "archived">("active");
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
@@ -127,9 +127,10 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
     setDetailOpen(true);
   };
 
-  const activeRequests = allRequests.filter((r) => r.status !== "archived");
+  const activeRequests = allRequests.filter((r) => r.status === "pending" || r.status === "in_review");
+  const completedRequests = allRequests.filter((r) => r.status === "completed");
   const archivedRequests = allRequests.filter((r) => r.status === "archived");
-  const requests = view === "active" ? activeRequests : archivedRequests;
+  const requests = view === "active" ? activeRequests : view === "completed" ? completedRequests : archivedRequests;
 
   return (
     <div className="min-h-screen bg-background">
@@ -160,7 +161,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Review Requests</h2>
-            <p className="text-sm text-muted-foreground mt-1">{requests.length} {view === "active" ? "active" : "archived"} requests</p>
+            <p className="text-sm text-muted-foreground mt-1">{requests.length} {view} requests</p>
           </div>
           <RequestForm onCreated={fetchRequests} />
         </div>
@@ -172,6 +173,13 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
             onClick={() => setView("active")}
           >
             Active ({activeRequests.length})
+          </Button>
+          <Button
+            variant={view === "completed" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setView("completed")}
+          >
+            Completed ({completedRequests.length})
           </Button>
           <Button
             variant={view === "archived" ? "default" : "outline"}
