@@ -264,21 +264,21 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                       </td>
                       <td className="py-3 px-4">
                         {r.report_pdf_path && (
-                          <button
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={async (e) => {
                               e.stopPropagation();
-                              const { data, error } = await supabase.storage
+                              const { data } = await supabase.storage
                                 .from("review-reports")
                                 .createSignedUrl(r.report_pdf_path!, 3600);
-                              if (data?.signedUrl) {
-                                window.open(data.signedUrl, "_blank");
-                              }
+                              if (data?.signedUrl) window.open(data.signedUrl, "_blank");
                             }}
                             title="Download Report"
-                            className="inline-flex"
                           >
-                            <Download className="w-4 h-4 text-primary hover:text-primary/80" />
-                          </button>
+                            <Download className="w-4 h-4" />
+                          </Button>
                         )}
                       </td>
                     </tr>
