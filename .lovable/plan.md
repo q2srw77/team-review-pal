@@ -1,17 +1,28 @@
 
 
-## Fix Edit Button Overlapping Close (X) Button
+## Make PDF Download Icon a Proper Button
 
-### Problem
-In the `Sheet` detail panel, the Edit button sits in the top-right corner of the `SheetHeader`, which overlaps with the Sheet's built-in close X button (rendered by `SheetContent` at `absolute right-4 top-4`).
+### Change in `src/pages/Dashboard.tsx` (around line 188)
 
-### Fix — `src/components/RequestDetail.tsx` (line ~382)
-
-Add right padding to the header's flex container so the Edit/Cancel/Save buttons don't overlap the Sheet's close X:
+Replace the inline `<button>` wrapping the Download icon with a proper `<Button>` component using `size="icon"` and `variant="outline"`:
 
 ```tsx
-<div className="flex items-start justify-between gap-2 pr-8">
+<Button
+  variant="outline"
+  size="icon"
+  className="h-8 w-8"
+  onClick={async (e) => {
+    e.stopPropagation();
+    const { data } = await supabase.storage
+      .from("review-reports")
+      .createSignedUrl(r.report_pdf_path!, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  }}
+  title="Download Report"
+>
+  <Download className="w-4 h-4" />
+</Button>
 ```
 
-This adds `pr-8` (2rem / 32px) of right padding to the header row, giving the close X button enough clearance. Single line change.
+Single file, single change.
 
