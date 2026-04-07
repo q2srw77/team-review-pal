@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Archive, Trash2 } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Archive, Trash2, Lock } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -555,6 +555,12 @@ export default function RequestDetail({
             return visibleStatuses.length > 0 ? (
             <div>
               <h3 className="font-semibold text-sm mb-3">Reviewer Progress</h3>
+              {(request.status === "completed" || request.status === "archived") && (
+                <div className="mb-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5" />
+                  This review is complete and locked for further changes.
+                </div>
+              )}
               <div className="space-y-2">
                 {visibleStatuses.map((rs) => {
                   const Icon = REVIEWER_STATUS_ICON[rs.status] ?? Circle;
@@ -569,7 +575,7 @@ export default function RequestDetail({
                         }`} />
                         <span className="text-sm font-medium">{rs.reviewer_name}{isMe ? " (You)" : ""}</span>
                       </div>
-                      {isMe && isReviewer ? (
+                      {isMe && isReviewer && request.status !== "completed" && request.status !== "archived" ? (
                         <Select value={rs.status} onValueChange={updateMyReviewStatus}>
                           <SelectTrigger className="h-7 w-32 text-xs">
                             <SelectValue />
@@ -617,7 +623,7 @@ export default function RequestDetail({
               ))}
             </div>
 
-            {isReviewer && (
+            {isReviewer && request.status !== "completed" && request.status !== "archived" && (
               <div className="mt-4 space-y-2">
                 <Textarea
                   value={newNote}
