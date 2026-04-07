@@ -1,33 +1,40 @@
 
 
-## Fix Function Search Path Mutable Warning
+## Fix Privilege Escalation on `user_roles` Table
 
 ### Problem
-Four database functions in the `public` schema lack a `SET search_path` configuration, which the Supabase linter flags as a security risk. Without an explicit search path, these functions could be exploited via schema injection.
-
-### Affected Functions
-- `enqueue_email`
-- `read_email_batch`
-- `delete_email`
-- `move_to_dlq`
+The `user_roles` table relies solely on an `ALL` policy for admins. While Postgres RLS should deny inserts for non-admins by default, best practice is to add an explicit INSERT policy restricting writes to `service_role` only — since all role provisioning already goes through edge functions (`setup-admin`, `invite-user`, `manage-user`) that use the service role key.
 
 ### Fix
-One database migration that re-creates all four functions with `SET search_path TO 'public'` added:
+One database migration adding three policies for defense-in-depth:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.enqueue_email(queue_name TEXT, payload JSONB)
-RETURNS BIGINT LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
+-- Only service_role (edge functions) can insert roles
+CREATE POLICY "Service role can insert user roles"
+ON public.user_roles FOR INSERT TO service_role
+WITH CHECK (true);
 
-CREATE OR REPLACE FUNCTION public.read_email_batch(queue_name TEXT, batch_size INT, vt INT)
-RETURNS SETOF pgmq.message LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
+-- Only service_role can update roles
+CREATE POLICY "Service role can update user roles"
+ON public.user_roles FOR UPDATE TO service_role
+USING (true) WITH CHECK (true);
 
-CREATE OR REPLACE FUNCTION public.delete_email(queue_name TEXT, message_id BIGINT)
-RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
+-- Only service_role can delete roles
+CREATE POLICY "Service role can delete user roles"
+ON public.user_roles FOR DELETE TO service_role
+USING (true);
+```
 
-CREATE OR REPLACE FUNCTION public.move_to_dlq(source_queue TEXT, dead_letter_queue TEXT, message_id BIGINT)
-RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$ ... $$;
+The existing "Admins can manage roles" `ALL` policy should be replaced with a SELECT-only policy so admins can still **view** all roles but cannot directly write to the table from the client:
+
+```sql
+DROP POLICY "Admins can manage roles" ON public.user_roles;
+
+CREATE POLICY "Admins can view all roles"
+ON public.user_roles FOR SELECT TO authenticated
+USING (has_role(auth.uid(), 'admin'));
 ```
 
 ### Scope
-- **1 new migration file** — no application code changes needed.
+- **1 migration file** — no application code changes needed (all role mutations already use edge functions with service role).
 
