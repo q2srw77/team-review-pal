@@ -1,17 +1,17 @@
 
 
-## Make `review-reports` Storage Bucket Private
+## Fix Edit Button Overlapping Close (X) Button
 
 ### Problem
-The `review-reports` bucket is marked as public, meaning anyone with the URL pattern can access reports without authentication. The code already correctly uses signed URLs everywhere, so the only change needed is flipping the bucket to private.
+In the `Sheet` detail panel, the Edit button sits in the top-right corner of the `SheetHeader`, which overlaps with the Sheet's built-in close X button (rendered by `SheetContent` at `absolute right-4 top-4`).
 
-### Fix
-One database migration:
+### Fix — `src/components/RequestDetail.tsx` (line ~382)
 
-```sql
-UPDATE storage.buckets SET public = false WHERE id = 'review-reports';
+Add right padding to the header's flex container so the Edit/Cancel/Save buttons don't overlap the Sheet's close X:
+
+```tsx
+<div className="flex items-start justify-between gap-2 pr-8">
 ```
 
-### Scope
-- **1 migration file** — no application code changes needed (all access already uses `createSignedUrl()`).
+This adds `pr-8` (2rem / 32px) of right padding to the header row, giving the close X button enough clearance. Single line change.
 
