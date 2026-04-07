@@ -1,24 +1,24 @@
 
 
-## Sort Completed Requests to Bottom of Active View
+## Lock Completed Review Requests
 
-### Change in `src/pages/Dashboard.tsx` (lines 86-91)
+### Problem
+Once all reviewers mark a request as completed, reviewers can still change their status and add notes. Late changes go unseen by the submitter.
 
-Replace the current sort with a two-tier sort:
-1. **Primary**: Completed requests sink to the bottom (status `completed` gets weight 1, others get 0)
-2. **Secondary**: Within same tier, sort by `complete_by` date ascending (nulls last)
+### Approach
+UI-only lock — when `request.status === "completed"`, disable the reviewer status dropdown and the add-note form. No database changes needed since the existing RLS doesn't need tightening for this.
 
-```typescript
-all.sort((a, b) => {
-  const aCompleted = a.status === "completed" ? 1 : 0;
-  const bCompleted = b.status === "completed" ? 1 : 0;
-  if (aCompleted !== bCompleted) return aCompleted - bCompleted;
-  if (!a.complete_by && !b.complete_by) return 0;
-  if (!a.complete_by) return 1;
-  if (!b.complete_by) return -1;
-  return new Date(a.complete_by).getTime() - new Date(b.complete_by).getTime();
-});
-```
+### Changes to `src/components/RequestDetail.tsx`
 
-### Single file change: `src/pages/Dashboard.tsx`
+1. **Reviewer status dropdown (line ~572)**: Add a condition so the status `<Select>` only renders when the request is not completed/archived. When locked, show a read-only badge instead (same as non-self reviewers already see).
+
+   Change: `{isMe && isReviewer ? (` → `{isMe && isReviewer && request.status !== "completed" && request.status !== "archived" ? (`
+
+2. **Add Note form (line ~620)**: Only show the note textarea and button when the request is not completed/archived.
+
+   Change: `{isReviewer && (` → `{isReviewer && request.status !== "completed" && request.status !== "archived" && (`
+
+3. **Add a visual indicator**: Show a small info message when the request is completed, e.g. `"This review is complete and locked for further changes."` above the reviewer progress section.
+
+### Single file change: `src/components/RequestDetail.tsx`
 
