@@ -1,47 +1,50 @@
 
 
-## Remove Archive Feature Entirely
+## Multi-Select Members When Adding to Team
 
-### Summary
-Remove the "Archived" status, filter tab, archive button, archive cron cleanup, and the `archived_at` column from the entire application.
+### Problem
+Currently, the "Manage Members" dialog uses a single `<Select>` dropdown, allowing only one user to be added at a time.
 
-### Database Migration (1 file)
+### Solution
+Replace the single-select dropdown with a checkbox list of available users, allowing multiple selections before clicking "Add".
 
-1. **Remove `archived` from the `request_status` enum** — rename the enum without the `archived` value (Postgres requires creating a new enum, migrating data, and swapping):
-   - Update any rows with `status = 'archived'` to `'completed'` (so no data is lost)
-   - Create new enum without `archived`, swap columns
-2. **Drop the `archived_at` column** from `review_requests`
-3. **Drop the `cleanup_old_archived_requests()` function**
+### Changes — `src/components/settings/TeamManagement.tsx`
 
-```sql
--- Move any archived requests to completed
-UPDATE public.review_requests SET status = 'completed' WHERE status = 'archived';
+1. **Replace `selectedUserId` (string) with `selectedUserIds` (string[])** state.
 
--- Recreate enum without 'archived'
-ALTER TYPE public.request_status RENAME TO request_status_old;
-CREATE TYPE public.request_status AS ENUM ('pending', 'in_review', 'completed');
-ALTER TABLE public.review_requests
-  ALTER COLUMN status TYPE public.request_status USING status::text::public.request_status;
-DROP TYPE public.request_status_old;
+2. **Replace the `<Select>` dropdown** with a scrollable list of available profiles, each with a `<Checkbox>` and user name/email. Something like:
+   ```tsx
+   <div className="border rounded-md max-h-40 overflow-y-auto p-2 space-y-1">
+     {availableProfiles.map((p) => (
+       <label key={p.user_id} className="flex items-center gap-2 p-1.5 rounded hover:bg-accent cursor-pointer text-sm">
+         <Checkbox
+           checked={selectedUserIds.includes(p.user_id)}
+           onCheckedChange={(checked) => {
+             setSelectedUserIds(prev =>
+               checked ? [...prev, p.user_id] : prev.filter(id => id !== p.user_id)
+             );
+           }}
+         />
+         <span>{p.full_name || p.email}</span>
+       </label>
+     ))}
+   </div>
+   ```
 
--- Drop archived_at column
-ALTER TABLE public.review_requests DROP COLUMN archived_at;
+3. **Update `addMember`** to insert all selected users at once:
+   ```tsx
+   const rows = selectedUserIds.map(uid => ({ team_id: membersTarget.id, user_id: uid }));
+   const { error } = await supabase.from("team_members").insert(rows);
+   ```
+   Show toast with count: `"${selectedUserIds.length} member(s) added"`.
 
--- Drop cleanup function
-DROP FUNCTION IF EXISTS public.cleanup_old_archived_requests();
-```
-
-### Frontend Changes
-
-| File | Changes |
-|------|---------|
-| `src/pages/Dashboard.tsx` | Remove `archived` from `STATUS_STYLES`, `STATUS_LABELS`, view state type (change to `"active" \| "completed"`), remove `archivedRequests` filter, remove Archived tab button |
-| `src/components/RequestDetail.tsx` | Remove `Archive` import, `archiving` state, `archiveRequest` function, Archive button/dialog, remove `archived` from `STATUS_STYLES`/`STATUS_LABELS`, update locked-status checks from `"completed" \| "archived"` to just `"completed"` |
-| `src/components/settings/AuditLogs.tsx` | Remove `archived` from action filter dropdown and style map |
+4. **Update the Add button** to show count and disable when none selected:
+   ```tsx
+   <Button disabled={selectedUserIds.length === 0}>
+     Add ({selectedUserIds.length})
+   </Button>
+   ```
 
 ### Files Modified
-- 1 new migration file
-- `src/pages/Dashboard.tsx`
-- `src/components/RequestDetail.tsx`
-- `src/components/settings/AuditLogs.tsx`
+- `src/components/settings/TeamManagement.tsx`
 
