@@ -379,7 +379,7 @@ export default function RequestDetail({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent className="sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 pr-8">
             <SheetTitle className="text-xl flex-1">
               {editing ? (
                 <Input
