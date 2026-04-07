@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Archive, Trash2, Lock } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Trash2, Lock } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,14 +48,12 @@ const STATUS_STYLES: Record<RequestStatus, string> = {
   pending: "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.3)]",
   in_review: "bg-[hsl(var(--status-in-review)/0.15)] text-[hsl(var(--status-in-review))] border-[hsl(var(--status-in-review)/0.3)]",
   completed: "bg-[hsl(var(--status-completed)/0.15)] text-[hsl(var(--status-completed))] border-[hsl(var(--status-completed)/0.3)]",
-  archived: "bg-muted text-muted-foreground border-muted-foreground/30",
 };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   pending: "Pending",
   in_review: "In Review",
   completed: "Completed",
-  archived: "Archived",
 };
 
 const REVIEWER_STATUS_ICON: Record<string, typeof Circle> = {
@@ -93,7 +91,6 @@ export default function RequestDetail({
   const [editCompleteBy, setEditCompleteBy] = useState<Date | undefined>();
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
-  const [archiving, setArchiving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -105,7 +102,7 @@ export default function RequestDetail({
     setEditing(false);
   }, [request, open]);
 
-  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed" && request?.status !== "archived";
+  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
   const canArchiveDelete = user?.id === request?.submitted_by || isAdmin;
 
   const enterEditMode = async () => {
@@ -158,31 +155,6 @@ export default function RequestDetail({
       toast({ title: "Updated", description: "Review request updated successfully." });
       setEditing(false);
       onUpdated();
-    }
-  };
-
-  const archiveRequest = async () => {
-    if (!request) return;
-    setArchiving(true);
-    const { error } = await supabase
-      .from("review_requests")
-      .update({ status: "archived" as RequestStatus, archived_at: new Date().toISOString() } as any)
-      .eq("id", request.id);
-    setArchiving(false);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      if (user) {
-        supabase.functions.invoke("write-audit-log", {
-          body: {
-            action: "archived", entity_type: "review_request", entity_id: request.id,
-            details: { title: request.title },
-          },
-        }).catch(() => {});
-      }
-      toast({ title: "Archived", description: "Request has been archived." });
-      onUpdated();
-      onClose();
     }
   };
 
@@ -555,7 +527,7 @@ export default function RequestDetail({
             return visibleStatuses.length > 0 ? (
             <div>
               <h3 className="font-semibold text-sm mb-3">Reviewer Progress</h3>
-              {(request.status === "completed" || request.status === "archived") && (
+              {request.status === "completed" && (
                 <div className="mb-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5" />
                   This review is complete and locked for further changes.
@@ -575,7 +547,7 @@ export default function RequestDetail({
                         }`} />
                         <span className="text-sm font-medium">{rs.reviewer_name}{isMe ? " (You)" : ""}</span>
                       </div>
-                      {isMe && isReviewer && request.status !== "completed" && request.status !== "archived" ? (
+                      {isMe && isReviewer && request.status !== "completed" ? (
                         <Select value={rs.status} onValueChange={updateMyReviewStatus}>
                           <SelectTrigger className="h-7 w-32 text-xs">
                             <SelectValue />
@@ -623,7 +595,7 @@ export default function RequestDetail({
               ))}
             </div>
 
-            {isReviewer && request.status !== "completed" && request.status !== "archived" && (
+            {isReviewer && request.status !== "completed" && (
               <div className="mt-4 space-y-2">
                 <Textarea
                   value={newNote}
@@ -640,32 +612,11 @@ export default function RequestDetail({
             )}
           </div>
 
-          {/* Archive / Delete actions */}
-          {canArchiveDelete && request.status !== "archived" && (
+          {/* Delete action */}
+          {canArchiveDelete && (
             <>
               <Separator />
               <div className="flex items-center gap-2">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10" disabled={archiving}>
-                      <Archive className="w-4 h-4 mr-1.5" />
-                      {archiving ? "Archiving…" : "Archive"}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Archive this request?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will move the request to archived status. It will no longer appear in the default dashboard view.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={archiveRequest}>Archive</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" size="sm" disabled={deleting}>
