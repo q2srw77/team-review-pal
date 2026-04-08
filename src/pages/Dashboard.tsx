@@ -212,9 +212,12 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                       <td className="py-3 px-4 font-medium text-foreground">
                         <span className="flex items-center gap-1.5">
                           {r.title}
-                          {r.complete_by && differenceInDays(new Date(r.complete_by), new Date()) <= 3 && r.status !== "completed" && (
-                            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />
-                          )}
+                          {r.complete_by && r.status !== "completed" && (() => {
+                            const days = differenceInDays(new Date(r.complete_by), new Date());
+                            if (days < 0) return <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />;
+                            if (days <= 3) return <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />;
+                            return null;
+                          })()}
                         </span>
                       </td>
                       <td className="py-3 px-4">
