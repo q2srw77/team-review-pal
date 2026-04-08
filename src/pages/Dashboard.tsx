@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
 type ReviewRequest = Database["public"]["Tables"]["review_requests"]["Row"];
