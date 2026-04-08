@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
 type ReviewRequest = Database["public"]["Tables"]["review_requests"]["Row"];
@@ -213,7 +213,7 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
                         <span className="flex items-center gap-1.5">
                           {r.title}
                           {r.complete_by && r.status !== "completed" && (() => {
-                            const days = differenceInDays(new Date(r.complete_by), new Date());
+                            const days = differenceInCalendarDays(new Date(r.complete_by), new Date());
                             if (days < 0) return <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />;
                             if (days <= 3) return <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />;
                             return null;
