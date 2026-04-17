@@ -283,6 +283,14 @@ export default function RequestDetail({
 
   const updateMyReviewStatus = async (newStatus: string) => {
     if (!request || !user) return;
+    if (request.status === "completed") {
+      toast({
+        title: "Review locked",
+        description: "This review is closed and can no longer be updated.",
+        variant: "destructive",
+      });
+      return;
+    }
     const { error } = await supabase
       .from("review_statuses")
       .update({ status: newStatus, updated_at: new Date().toISOString() })
