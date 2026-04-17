@@ -232,9 +232,16 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
                         {r.team_id ? teamMap.get(r.team_id) ?? "—" : "—"}
                       </td>
                       <td className="py-3 px-4">
-                        <Badge variant="outline" className={STATUS_STYLES[r.status]}>
-                          {STATUS_LABELS[r.status]}
-                        </Badge>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge variant="outline" className={STATUS_STYLES[r.status]}>
+                            {STATUS_LABELS[r.status]}
+                          </Badge>
+                          {r.status === "completed" && (r as any).closed_reason === "deadline_reached" && (
+                            <Badge variant="outline" className="text-xs border-yellow-500/40 text-yellow-600 bg-yellow-500/10">
+                              Auto-closed
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3 px-4 hidden sm:table-cell">
                         {(() => {

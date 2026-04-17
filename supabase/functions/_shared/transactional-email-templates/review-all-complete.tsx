@@ -11,52 +11,77 @@ interface ReviewAllCompleteProps {
   title?: string
   platform?: string
   teamName?: string
+  closedReason?: 'all_reviewed' | 'deadline_reached'
+  completedCount?: number
+  totalCount?: number
 }
 
-const ReviewAllCompleteEmail = ({ title, platform, teamName }: ReviewAllCompleteProps) => (
-  <Html lang="en" dir="ltr">
-    <Head />
-    <Preview>All reviewers have completed: {title ?? 'your request'}</Preview>
-    <Body style={main}>
-      <Container style={container}>
-        <Heading style={h1}>All Reviews Complete</Heading>
-        <Text style={text}>
-          Great news! All reviewers have completed their review for <strong>{title ?? 'your request'}</strong>.
-        </Text>
+const ReviewAllCompleteEmail = ({ title, platform, teamName, closedReason, completedCount, totalCount }: ReviewAllCompleteProps) => {
+  const isDeadline = closedReason === 'deadline_reached'
+  return (
+    <Html lang="en" dir="ltr">
+      <Head />
+      <Preview>
+        {isDeadline
+          ? `Deadline reached — review closed: ${title ?? 'your request'}`
+          : `All reviewers have completed: ${title ?? 'your request'}`}
+      </Preview>
+      <Body style={main}>
+        <Container style={container}>
+          <Heading style={h1}>{isDeadline ? 'Review Closed (Deadline Reached)' : 'All Reviews Complete'}</Heading>
 
-        {platform && (
-          <Text style={detailText}>
-            <strong>Platform:</strong> {platform}
+          {isDeadline ? (
+            <Text style={text}>
+              The completion date for <strong>{title ?? 'your request'}</strong> has passed, so the review has been automatically closed.
+              {typeof completedCount === 'number' && typeof totalCount === 'number' && (
+                <> {completedCount} of {totalCount} reviewer{totalCount === 1 ? '' : 's'} completed their review.</>
+              )}
+            </Text>
+          ) : (
+            <Text style={text}>
+              Great news! All reviewers have completed their review for <strong>{title ?? 'your request'}</strong>.
+            </Text>
+          )}
+
+          {platform && (
+            <Text style={detailText}>
+              <strong>Platform:</strong> {platform}
+            </Text>
+          )}
+          {teamName && (
+            <Text style={detailText}>
+              <strong>Team:</strong> {teamName}
+            </Text>
+          )}
+
+          <Text style={text}>
+            A full PDF report with reviewer comments is being generated and will be emailed to you shortly.
           </Text>
-        )}
-        {teamName && (
-          <Text style={detailText}>
-            <strong>Team:</strong> {teamName}
+
+          <Hr style={hr} />
+          <Text style={footer}>
+            {SITE_NAME}
           </Text>
-        )}
-
-        <Text style={text}>
-          A full PDF report with reviewer comments is being generated and will be emailed to you shortly.
-        </Text>
-
-        <Hr style={hr} />
-        <Text style={footer}>
-          {SITE_NAME}
-        </Text>
-      </Container>
-    </Body>
-  </Html>
-)
+        </Container>
+      </Body>
+    </Html>
+  )
+}
 
 export const template = {
   component: ReviewAllCompleteEmail,
   subject: (data: Record<string, any>) =>
-    `All reviews complete: ${data?.title ?? 'your request'}`,
+    data?.closedReason === 'deadline_reached'
+      ? `Review closed (deadline reached): ${data?.title ?? 'your request'}`
+      : `All reviews complete: ${data?.title ?? 'your request'}`,
   displayName: 'All reviews complete notification',
   previewData: {
     title: 'Homepage Redesign',
     platform: 'Storylane',
     teamName: 'Design Team',
+    closedReason: 'deadline_reached',
+    completedCount: 2,
+    totalCount: 3,
   },
 } satisfies TemplateEntry
 
