@@ -1,36 +1,68 @@
 
 
-## Add User Profile Page
+## Review: Gaps in Review Hub Auto-Close + Completion Notification Flow
 
-### Overview
-Add a "Profile" page accessible from the dashboard header (via a user icon button next to the settings gear). The page shows the user's name, email, role badges, team memberships (read-only), and a password change form.
+### What works today
+- Submitters create requests with a `complete_by` date (RequestForm.tsx).
+- Reviewers update individual statuses; `auto_update_request_status` trigger flips request to `completed` only when ALL reviewers complete.
+- On final completion, RequestDetail triggers `review-all-complete` email + `generate-review-report` PDF.
+- Overdue requests show a red warning icon on the dashboard.
 
-### Changes
+### Gaps Found
 
-#### 1. New file: `src/pages/Profile.tsx`
-- Display user's name and email (from `useAuth` + profiles table)
-- Display role badges (from `useAuth`)
-- Fetch and display team memberships: query `team_members` joined with `teams` for the current user, render as a read-only list (team name + description)
-- Password change form: current password field (not strictly needed by Supabase but good UX), new password, confirm new password. On submit call `supabase.auth.updateUser({ password: newPassword })`. Show success/error toast.
-- Back button to return to dashboard
+**1. No auto-close on `complete_by` date (the core gap in your request)**
+Today, a request only reaches `completed` when every reviewer manually marks "completed". If the deadline passes with pending reviewers, the request stays `pending`/`in_review` forever — the submitter never gets the "review is ready" email.
 
-#### 2. Update `src/pages/Index.tsx`
-- Add `"profile"` to the page state union type
-- Render `<Profile onBack={() => setPage("dashboard")} />` when `page === "profile"`
-- Pass `onNavigateProfile` callback to `Dashboard`
+**2. No scheduled job watching deadlines**
+There is no pg_cron job or edge function that scans for overdue requests. The existing daily cron (per memory) is for digest reports, not auto-closing.
 
-#### 3. Update `src/pages/Dashboard.tsx`
-- Accept new prop `onNavigateProfile?: () => void`
-- Add a `User` icon button in the header (next to profileName) that calls `onNavigateProfile`
+**3. Submitter completion email only fires on full reviewer consensus**
+The `review-all-complete` email is invoked from the client (`RequestDetail.updateMyReviewStatus`) at the moment the last reviewer completes. If auto-close happens server-side via cron, that client path won't run — we need server-side email dispatch too.
 
-### Technical Details
-- Password update uses `supabase.auth.updateUser({ password })` — no edge function needed
-- Team list query: `supabase.from("team_members").select("team_id, teams(name, description)").eq("user_id", user.id)`
-- RLS already allows users to see their own team memberships
-- No database changes required
+**4. No indicator that a request was auto-closed vs. fully reviewed**
+Submitter can't distinguish "all reviewers finished" from "deadline hit, partial reviews". The completion email/report should reflect this.
 
-### Files Modified
-- `src/pages/Profile.tsx` (new)
-- `src/pages/Index.tsx`
-- `src/pages/Dashboard.tsx`
+### Proposed Solution
+
+**A. New edge function: `auto-close-overdue-requests`**
+- Runs on a schedule (pg_cron, every hour or daily at a chosen time).
+- Selects `review_requests` where `status != 'completed'` AND `complete_by < CURRENT_DATE`.
+- For each overdue request:
+  - Marks remaining `pending`/`in_review` reviewer statuses as `auto_closed` (new status value) OR leaves them and just flips request status.
+  - Updates `review_requests.status` to `completed` (using service role, bypasses RLS).
+  - Invokes `send-transactional-email` with `review-all-complete` template to the submitter (idempotency key: `auto-close-${requestId}`).
+  - Invokes `generate-review-report` to produce the PDF.
+  - Writes an audit log entry (`action: 'auto_closed'`).
+
+**B. Schema addition (minimal)**
+- Add nullable `closed_reason text` column to `review_requests` (`'all_reviewed'` | `'deadline_reached'`) so the UI and email can distinguish them.
+- Optional: add `'auto_closed'` to allowed `review_statuses.status` values so partial reviews aren't misrepresented as `completed`.
+
+**C. Email template tweak**
+- Update `review-all-complete.tsx` to optionally show a "Closed due to deadline (X of Y reviewers completed)" note when `closedReason === 'deadline_reached'`.
+
+**D. Dashboard UI**
+- Show a small "Auto-closed" badge on completed requests where `closed_reason = 'deadline_reached'` so submitters understand context.
+
+**E. pg_cron schedule**
+- Insert a cron job (hourly) calling the new edge function via `net.http_post` with the service-role-authenticated URL pattern already used elsewhere.
+
+### Files to Create / Modify
+
+- **New**: `supabase/functions/auto-close-overdue-requests/index.ts`
+- **New migration**: add `closed_reason` column + cron job SQL (cron via insert tool, since it contains URL/keys)
+- **Modify**: `supabase/functions/_shared/transactional-email-templates/review-all-complete.tsx` (optional deadline note)
+- **Modify**: `src/components/RequestDetail.tsx` (display closed_reason badge/note)
+- **Modify**: `src/pages/Dashboard.tsx` (small badge for auto-closed requests)
+- **Modify**: `supabase/config.toml` if function-specific config needed
+
+### Open Question
+
+Before I implement, one decision point:
+
+When the deadline passes with some reviewers still pending, should we:
+- **(A) Force-close**: mark request `completed`, leave incomplete reviewer rows as `pending`, send submitter the report with whatever notes exist.
+- **(B) Soft-close**: keep request open but send the submitter a "deadline reached, partial review available" email and lock further edits.
+
+I recommend **(A) Force-close** since your request says "the review should close" and "submitter gets automated update that review is ready" — that maps cleanly to status=`completed` + report email.
 
