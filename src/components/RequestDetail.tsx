@@ -283,6 +283,14 @@ export default function RequestDetail({
 
   const updateMyReviewStatus = async (newStatus: string) => {
     if (!request || !user) return;
+    if (request.status === "completed") {
+      toast({
+        title: "Review locked",
+        description: "This review is closed and can no longer be updated.",
+        variant: "destructive",
+      });
+      return;
+    }
     const { error } = await supabase
       .from("review_statuses")
       .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -528,15 +536,33 @@ export default function RequestDetail({
             <div>
               <h3 className="font-semibold text-sm mb-3">Reviewer Progress</h3>
               {request.status === "completed" && (
-                <div className="mb-3 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5" />
-                  This review is complete and locked for further changes.
+                <div className={cn(
+                  "mb-3 rounded-md px-3 py-2 text-xs flex items-start gap-1.5",
+                  request.closed_reason === "deadline_reached"
+                    ? "bg-[hsl(var(--status-pending)/0.1)] text-[hsl(var(--status-pending))] border border-[hsl(var(--status-pending)/0.3)]"
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    {request.closed_reason === "deadline_reached" ? (
+                      <>
+                        Auto-closed on {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "deadline"}.
+                        Remaining reviewer statuses are frozen as-is.
+                      </>
+                    ) : (
+                      "This review is complete and locked for further changes."
+                    )}
+                  </span>
                 </div>
               )}
               <div className="space-y-2">
                 {visibleStatuses.map((rs) => {
                   const Icon = REVIEWER_STATUS_ICON[rs.status] ?? Circle;
                   const isMe = rs.reviewer_id === user?.id;
+                  const isAutoClosedIncomplete =
+                    request.status === "completed" &&
+                    request.closed_reason === "deadline_reached" &&
+                    rs.status !== "completed";
                   return (
                     <div key={rs.id} className="flex items-center justify-between bg-secondary/40 rounded-lg p-3">
                       <div className="flex items-center gap-2">
@@ -546,6 +572,11 @@ export default function RequestDetail({
                           "text-muted-foreground"
                         }`} />
                         <span className="text-sm font-medium">{rs.reviewer_name}{isMe ? " (You)" : ""}</span>
+                        {isAutoClosedIncomplete && (
+                          <span className="text-[10px] uppercase tracking-wide text-muted-foreground border border-border rounded px-1.5 py-0.5">
+                            Did not complete
+                          </span>
+                        )}
                       </div>
                       {isMe && isReviewer && request.status !== "completed" ? (
                         <Select value={rs.status} onValueChange={updateMyReviewStatus}>
