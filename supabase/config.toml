@@ -19,7 +19,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.auto-close-overdue-requests]
-verify_jwt = false
+verify_jwt = true
 
 [functions.send-review-reminders]
-verify_jwt = false
+verify_jwt = true
