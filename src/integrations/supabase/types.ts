@@ -211,6 +211,38 @@ export type Database = {
           },
         ]
       }
+      review_reminders_sent: {
+        Row: {
+          days_before: number
+          id: string
+          request_id: string
+          reviewer_id: string
+          sent_at: string
+        }
+        Insert: {
+          days_before: number
+          id?: string
+          request_id: string
+          reviewer_id: string
+          sent_at?: string
+        }
+        Update: {
+          days_before?: number
+          id?: string
+          request_id?: string
+          reviewer_id?: string
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_reminders_sent_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "review_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_requests: {
         Row: {
           closed_reason: string | null
