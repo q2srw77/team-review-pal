@@ -1,28 +1,36 @@
 
 
-## Fix: Overdue Warning Icon Showing Yellow Instead of Red
+## Add User Profile Page
 
-### Problem
-The "Test Email Review" request has a Complete By date of Apr 7, 2026 — which is yesterday (Apr 8, 2026 today). It should show a **red** warning icon but is showing **yellow** instead.
+### Overview
+Add a "Profile" page accessible from the dashboard header (via a user icon button next to the settings gear). The page shows the user's name, email, role badges, team memberships (read-only), and a password change form.
 
-### Root Cause
-`differenceInDays` from `date-fns` compares timestamps including time components. When `complete_by` is `"2026-04-07"` (a date-only string), `new Date("2026-04-07")` creates midnight UTC. Meanwhile `new Date()` returns the current local time. Depending on timezone, `differenceInDays` may return `0` instead of `-1` for a date that was yesterday, causing it to hit the `days <= 3` (yellow) branch instead of `days < 0` (red).
+### Changes
 
-### Fix — `src/pages/Dashboard.tsx` (line ~216)
+#### 1. New file: `src/pages/Profile.tsx`
+- Display user's name and email (from `useAuth` + profiles table)
+- Display role badges (from `useAuth`)
+- Fetch and display team memberships: query `team_members` joined with `teams` for the current user, render as a read-only list (team name + description)
+- Password change form: current password field (not strictly needed by Supabase but good UX), new password, confirm new password. On submit call `supabase.auth.updateUser({ password: newPassword })`. Show success/error toast.
+- Back button to return to dashboard
 
-Use `startOfDay` from date-fns to normalize both dates before comparison, or switch to `isPast` / `isBefore` with date-only comparison:
+#### 2. Update `src/pages/Index.tsx`
+- Add `"profile"` to the page state union type
+- Render `<Profile onBack={() => setPage("dashboard")} />` when `page === "profile"`
+- Pass `onNavigateProfile` callback to `Dashboard`
 
-```tsx
-import { format, differenceInCalendarDays } from "date-fns";
+#### 3. Update `src/pages/Dashboard.tsx`
+- Accept new prop `onNavigateProfile?: () => void`
+- Add a `User` icon button in the header (next to profileName) that calls `onNavigateProfile`
 
-// Replace differenceInDays with differenceInCalendarDays
-const days = differenceInCalendarDays(new Date(r.complete_by), new Date());
-if (days < 0) return <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />;
-if (days <= 3) return <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0" />;
-```
-
-`differenceInCalendarDays` compares calendar dates (ignoring time), so Apr 7 vs Apr 8 will always return `-1` regardless of timezone. This is a single import change and one function name change on one line.
+### Technical Details
+- Password update uses `supabase.auth.updateUser({ password })` — no edge function needed
+- Team list query: `supabase.from("team_members").select("team_id, teams(name, description)").eq("user_id", user.id)`
+- RLS already allows users to see their own team memberships
+- No database changes required
 
 ### Files Modified
-- `src/pages/Dashboard.tsx` — replace `differenceInDays` with `differenceInCalendarDays`
+- `src/pages/Profile.tsx` (new)
+- `src/pages/Index.tsx`
+- `src/pages/Dashboard.tsx`
 
