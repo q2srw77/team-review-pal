@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle, User } from "lucide-react";
 import { format, differenceInCalendarDays } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -26,7 +26,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
   completed: "Completed",
 };
 
-export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?: () => void }) {
+export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { onNavigateSettings?: () => void; onNavigateProfile?: () => void }) {
   const { user, signOut, isAdmin, roles, profileName, loading } = useAuth();
   const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
@@ -144,6 +144,11 @@ export default function Dashboard({ onNavigateSettings }: { onNavigateSettings?:
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">{profileName}</span>
+            {onNavigateProfile && (
+              <Button variant="ghost" size="icon" onClick={onNavigateProfile} title="Profile">
+                <User className="w-4 h-4" />
+              </Button>
+            )}
             {isAdmin && onNavigateSettings && (
               <Button variant="ghost" size="icon" onClick={onNavigateSettings}>
                 <Settings className="w-4 h-4" />
