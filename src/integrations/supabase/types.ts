@@ -213,6 +213,7 @@ export type Database = {
       }
       review_requests: {
         Row: {
+          closed_reason: string | null
           complete_by: string | null
           created_at: string
           id: string
@@ -227,6 +228,7 @@ export type Database = {
           url_location: string
         }
         Insert: {
+          closed_reason?: string | null
           complete_by?: string | null
           created_at?: string
           id?: string
@@ -241,6 +243,7 @@ export type Database = {
           url_location?: string
         }
         Update: {
+          closed_reason?: string | null
           complete_by?: string | null
           created_at?: string
           id?: string
