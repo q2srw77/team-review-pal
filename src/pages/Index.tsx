@@ -4,12 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Settings from "@/pages/Settings";
+import Profile from "@/pages/Profile";
 import SetupForm from "@/components/SetupForm";
 
 export default function Index() {
   const { user, loading, isAdmin } = useAuth();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
-  const [page, setPage] = useState<"dashboard" | "settings">("dashboard");
+  const [page, setPage] = useState<"dashboard" | "settings" | "profile">("dashboard");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,5 +43,14 @@ export default function Index() {
     return <Settings onBack={() => setPage("dashboard")} />;
   }
 
-  return <Dashboard onNavigateSettings={() => setPage("settings")} />;
+  if (page === "profile") {
+    return <Profile onBack={() => setPage("dashboard")} />;
+  }
+
+  return (
+    <Dashboard
+      onNavigateSettings={() => setPage("settings")}
+      onNavigateProfile={() => setPage("profile")}
+    />
+  );
 }
