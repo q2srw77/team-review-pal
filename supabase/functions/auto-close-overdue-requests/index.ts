@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
       .select("id, title, platform, team_id, submitted_by, complete_by, status, report_pdf_path")
       .neq("status", "completed")
       .not("complete_by", "is", null)
-      .lt("complete_by", today);
+      .lte("complete_by", today);
 
     if (fetchErr) {
       console.error("fetch overdue error", fetchErr);
