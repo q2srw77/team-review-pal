@@ -1,53 +1,62 @@
-## Position Labels for Platforms + Numbered Reviewer Notes
+## Allow Reviewers to Edit Their Own Notes
 
 ### Goal
-Let admins tag each platform with a position label (`Slide`, `Step`, `Page`, or `None`). When reviewers add a note on a request whose platform has a non-`None` label, they must enter a 1–3 digit number alongside the comment. Notes are then displayed (and exported) ordered by that number rather than by timestamp.
+A reviewer can edit the content (and position number, when applicable) of notes they themselves authored. No one — not other reviewers, not submitters, not even admins — can edit someone else's note. Editing is blocked once the request is `completed` (consistent with the existing lock behavior for status changes).
 
-### Database
-New column on `platforms`:
-- `position_label text not null default 'None'` with a CHECK constraint limiting values to `'None' | 'Slide' | 'Step' | 'Page'`.
+### Database (migration)
 
-New column on `request_notes`:
-- `position_number int null` — stores the slide/step/page number (1–999). Null for notes on `None`-labeled platforms or legacy notes.
+Add an RLS UPDATE policy on `public.request_notes`:
 
-No data migration needed; existing rows default to `None` / `null`.
+```sql
+CREATE POLICY "Authors can update own notes"
+ON public.request_notes
+FOR UPDATE
+TO authenticated
+USING (auth.uid() = author_id)
+WITH CHECK (auth.uid() = author_id);
+```
 
-### Backend / Edge Functions
-`supabase/functions/generate-review-report/index.ts`:
-- Select `position_number` along with note fields.
-- When the request's platform has a non-`None` `position_label`, sort notes by `position_number ASC NULLS LAST, created_at ASC` and prefix each note's printed body with `"<Label> <n>: "`. Otherwise keep current `created_at ASC` ordering.
+No schema change — `position_number` already exists. The policy intentionally does **not** include admins; only the author may edit.
 
-(Auto-generated `types.ts` will update automatically after the migration — no manual edit.)
+(Optional hardening: a `BEFORE UPDATE` trigger that blocks updates when the parent `review_requests.status = 'completed'`. Including this so the lock is enforced server-side, not just in the UI.)
 
-### Frontend
+```sql
+CREATE OR REPLACE FUNCTION public.prevent_note_edit_when_completed()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.review_requests rr
+             WHERE rr.id = NEW.request_id AND rr.status = 'completed') THEN
+    RAISE EXCEPTION 'Cannot edit notes on a completed request';
+  END IF;
+  RETURN NEW;
+END $$;
 
-**`src/components/settings/PlatformManagement.tsx`**
-- Show a `Position Label` column in the table.
-- Add a `Select` (Slide / Step / Page / None) to the Add and Edit dialogs; default `None`.
-- Persist `position_label` on insert/update.
+CREATE TRIGGER request_notes_block_edit_when_completed
+BEFORE UPDATE ON public.request_notes
+FOR EACH ROW EXECUTE FUNCTION public.prevent_note_edit_when_completed();
+```
 
-**`src/components/RequestDetail.tsx`**
-- Fetch the current request's platform row to know its `position_label` (single query in `useEffect`).
-- Reviewer "Add note" UI: when label ≠ `None`, render a small numeric `Input` (`inputMode="numeric"`, `maxLength={3}`, regex-stripped to digits, range 1–999) next to the textarea, with the label as a prefix (e.g. `Slide [ 12 ]`). Number is required to submit when label ≠ `None`.
-- On submit, insert `position_number` along with `content` (store the raw user note in `content`, the number in `position_number` — no string parsing).
-- When fetching notes, also select `position_number`. If platform label ≠ `None`, sort notes client-side by `position_number` (nulls last), then `created_at`, and render each note's header with a chip like `Slide 12` before the author/date row.
-- Legacy notes (null `position_number`) appear at the bottom of the ordered list.
+### Frontend — `src/components/RequestDetail.tsx`
 
-**`src/components/RequestForm.tsx`** — no change. The number is captured per-note, not on the request itself.
-
-### UX details
-- Numeric input rejects non-digits via `onChange` filter (`value.replace(/\D/g, "").slice(0, 3)`).
-- Empty / `0` is invalid; show an inline message and disable the Add Note button.
-- The label text shown to reviewers comes from the platform row, so changing a platform's label later affects only future notes' display ordering — stored numbers remain valid.
-- For platforms with label `None`, the form behaves exactly as today.
-
-### Files Modified
-- `supabase/migrations/<new>.sql` (add columns + check constraint)
-- `src/components/settings/PlatformManagement.tsx`
-- `src/components/RequestDetail.tsx`
-- `supabase/functions/generate-review-report/index.ts`
+1. Track the current user id on each note item: include `author_id` in the `Note` interface and `fetchNotes` mapping.
+2. Add edit-mode state per note: `editingNoteId`, `editNoteContent`, `editNotePosition`.
+3. In the rendered note card, when `note.author_id === user.id` and `request.status !== "completed"`, show a small "Edit" pencil button next to the timestamp.
+4. Edit mode swaps the note body for a `Textarea` (and a numeric `Input` for position when `positionLabel !== "None"`), with Save / Cancel buttons.
+5. Save handler:
+   ```ts
+   await supabase
+     .from("request_notes")
+     .update({ content: trimmed, position_number: positionNumber })
+     .eq("id", note.id);
+   ```
+   Re-validate the position number with the same 1–999 rule as `addNote`. On success, clear edit state and call `fetchNotes()`.
+6. No changes to PDF generation — it already reads the latest `content` and `position_number`.
 
 ### Out of Scope
-- Editing `position_number` after a note is created.
-- Backfilling existing notes with parsed numbers from their content.
-- Changing email templates (reminder / all-complete) — they don't list note bodies.
+- Edit history / audit trail of note edits.
+- Admin override editing.
+- Editing notes after a request is completed.
+
+### Files Modified
+- New migration file under `supabase/migrations/`
+- `src/components/RequestDetail.tsx`
