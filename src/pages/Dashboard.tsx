@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import RequestForm from "@/components/RequestForm";
@@ -6,8 +6,10 @@ import RequestDetail from "@/components/RequestDetail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle, User } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle, User, Search, X } from "lucide-react";
 import { format, differenceInCalendarDays } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -125,9 +127,36 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
     setDetailOpen(true);
   };
 
+  const [search, setSearch] = useState("");
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Reset status filter when switching tabs (options differ)
+  useEffect(() => { setStatusFilter("all"); }, [view]);
+
   const activeRequests = allRequests.filter((r) => r.status === "pending" || r.status === "in_review");
   const completedRequests = allRequests.filter((r) => r.status === "completed");
-  const requests = view === "active" ? activeRequests : completedRequests;
+  const baseRequests = view === "active" ? activeRequests : completedRequests;
+
+  const platformOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of allRequests) if (r.platform) set.add(r.platform);
+    return Array.from(set).sort();
+  }, [allRequests]);
+
+  const requests = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return baseRequests.filter((r) => {
+      if (q && !r.title.toLowerCase().includes(q)) return false;
+      if (platformFilter !== "all" && r.platform !== platformFilter) return false;
+      if (view === "active" && statusFilter !== "all" && r.status !== statusFilter) return false;
+      return true;
+    });
+  }, [baseRequests, search, platformFilter, statusFilter, view]);
+
+  const filtersActive = search.trim() !== "" || platformFilter !== "all" || (view === "active" && statusFilter !== "all");
+  const clearFilters = () => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -165,7 +194,11 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Review Requests</h2>
-            <p className="text-sm text-muted-foreground mt-1">{requests.length} {view} requests</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {filtersActive
+                ? `Showing ${requests.length} of ${baseRequests.length} ${view} requests`
+                : `${requests.length} ${view} requests`}
+            </p>
           </div>
           <RequestForm onCreated={fetchRequests} />
         </div>
@@ -189,11 +222,70 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
           </Button>
         </div>
 
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by title…"
+              className="pl-9 pr-9"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-secondary text-muted-foreground"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          <Select value={platformFilter} onValueChange={setPlatformFilter}>
+            <SelectTrigger className="sm:w-48">
+              <SelectValue placeholder="All platforms" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All platforms</SelectItem>
+              {platformOptions.map((p) => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {view === "active" && (
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="sm:w-44">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_review">In Review</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+          {filtersActive && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="sm:self-stretch">
+              Clear
+            </Button>
+          )}
+        </div>
+
         {requests.length === 0 ? (
           <Card className="flex flex-col items-center justify-center py-20 text-center">
             <ClipboardCheck className="w-12 h-12 text-muted-foreground/40 mb-4" />
-            <p className="text-muted-foreground font-medium">No review requests yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Submit the first one to get started.</p>
+            {filtersActive ? (
+              <>
+                <p className="text-muted-foreground font-medium">No requests match your filters</p>
+                <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Clear filters</Button>
+              </>
+            ) : (
+              <>
+                <p className="text-muted-foreground font-medium">No review requests yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Submit the first one to get started.</p>
+              </>
+            )}
           </Card>
         ) : (
           <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
