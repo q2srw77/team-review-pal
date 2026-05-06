@@ -1,27 +1,26 @@
-# Review Hub Favicon
+# Replace Favicon with Header Logo
 
 ## Goal
-Add a custom favicon depicting a clipboard with a checkmark, matching the Review Hub brand.
+Replace the current favicon with one that matches the Review Hub header logo: a primary-colored rounded square containing a white clipboard-check (ClipboardCheck) icon.
+
+## Approach
+Recreate the header logo as a static PNG so it renders identically in browser tabs.
 
 ## Steps
 
-1. **Generate the favicon image**
-   - Use AI image generation to create a clean, flat clipboard-with-checkmark icon on a solid brand-colored background (rounded square, centered, high contrast, no text).
-   - Save as `public/favicon.png` at 512×512 (browsers downscale cleanly).
+1. **Generate the favicon**
+   - Create a 512×512 PNG that mirrors the in-app logo:
+     - Background: rounded square in the app's primary color (deep blue, matching `bg-primary`)
+     - Foreground: white Lucide-style `ClipboardCheck` icon, centered, ~55% of canvas
+     - Flat, crisp edges, no gradients or extra decoration
+   - Save as `public/favicon.png` (overwrite current).
 
-2. **Remove the default favicon**
-   - Delete `public/favicon.ico` so browsers don't fall back to the old one.
+2. **Keep `index.html` link tags as-is**
+   - Already points to `/favicon.png` and `/favicon.png` for apple-touch-icon — no edits needed.
 
-3. **Wire it up in `index.html`**
-   - Replace any existing favicon `<link>` with:
-     ```html
-     <link rel="icon" href="/favicon.png" type="image/png">
-     <link rel="apple-touch-icon" href="/favicon.png">
-     ```
-
-4. **Verify**
-   - Reload preview, confirm new favicon appears in the browser tab.
+3. **Verify**
+   - Hard refresh preview, confirm the tab icon now matches the in-app top-left logo.
 
 ## Notes
-- Single-color flat design ensures legibility at 16×16.
-- No code/business-logic changes — purely a static asset + `index.html` link update.
+- No component or business logic changes.
+- If the rendered PNG still looks off at favicon size, fall back to hand-crafted SVG using the exact Lucide ClipboardCheck path on a rounded-rect.
