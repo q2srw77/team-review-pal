@@ -23,14 +23,25 @@ Deno.serve(async (req) => {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(authHeader.replace('Bearer ', ''))
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const token = authHeader.replace('Bearer ', '')
+    let isServiceRole = false
+    try {
+      const payloadB64 = token.split('.')[1]
+      const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
+      const payload = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')))
+      isServiceRole = payload?.role === 'service_role'
+    } catch { /* fall through */ }
+
+    if (!isServiceRole) {
+      const anonClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
       })
+      const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
+      if (claimsError || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
