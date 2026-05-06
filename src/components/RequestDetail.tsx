@@ -700,16 +700,67 @@ export default function RequestDetail({
                 <div key={note.id} className="bg-secondary/40 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-1 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {positionLabel !== "None" && note.position_number != null && (
+                      {positionLabel !== "None" && note.position_number != null && editingNoteId !== note.id && (
                         <Badge variant="outline" className="text-[10px] uppercase tracking-wide shrink-0">
                           {positionLabel} {note.position_number}
                         </Badge>
                       )}
                       <span className="font-medium text-sm text-foreground truncate">{note.author_name}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground shrink-0">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
+                      {user?.id === note.author_id && request.status !== "completed" && editingNoteId !== note.id && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={() => startEditNote(note)}
+                          aria-label="Edit note"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm">{note.content}</p>
+                  {editingNoteId === note.id ? (
+                    <div className="space-y-2">
+                      {positionLabel !== "None" && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">{positionLabel} #</span>
+                          <Input
+                            value={editNotePosition}
+                            onChange={(e) => setEditNotePosition(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                            inputMode="numeric"
+                            maxLength={3}
+                            placeholder="1-999"
+                            className="h-8 w-24"
+                          />
+                        </div>
+                      )}
+                      <Textarea
+                        value={editNoteContent}
+                        onChange={(e) => setEditNoteContent(e.target.value)}
+                        rows={2}
+                        maxLength={2000}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => saveEditNote(note.id)}
+                          disabled={savingNote || !editNoteContent.trim() || (positionLabel !== "None" && !editNotePosition)}
+                        >
+                          <Save className="w-3.5 h-3.5 mr-1.5" />
+                          {savingNote ? "Saving…" : "Save"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEditNote} disabled={savingNote}>
+                          <X className="w-3.5 h-3.5 mr-1.5" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                  )}
                 </div>
               ))}
             </div>
