@@ -9,7 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle, User, Search, X } from "lucide-react";
+import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle, User, Search, X, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
 import { format, differenceInCalendarDays } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -30,6 +31,7 @@ const STATUS_LABELS: Record<RequestStatus, string> = {
 
 export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { onNavigateSettings?: () => void; onNavigateProfile?: () => void }) {
   const { user, signOut, isAdmin, roles, profileName, loading } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
   const [view, setView] = useState<"active" | "completed">("active");
@@ -195,6 +197,15 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
                 <User className="w-4 h-4" />
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle dark mode"
+            >
+              {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </Button>
             {isAdmin && onNavigateSettings && (
               <Button variant="ghost" size="icon" onClick={onNavigateSettings}>
                 <Settings className="w-4 h-4" />
