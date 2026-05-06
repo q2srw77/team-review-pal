@@ -540,6 +540,35 @@ export default function TeamManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Remove Member Confirmation */}
+      <AlertDialog open={!!removeConfirm} onOpenChange={(o) => { if (!o) setRemoveConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove {removeConfirm?.label}{membersTarget ? ` from ${membersTarget.name}` : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              They will lose access to this team's review requests. This can be undone by re-adding them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (removeConfirm) {
+                  await removeMembersByUserIds(removeConfirm.userIds);
+                }
+                setRemoveConfirm(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
     </div>
   );
 }
