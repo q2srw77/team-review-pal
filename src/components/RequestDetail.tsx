@@ -440,7 +440,7 @@ export default function RequestDetail({
           "flex flex-col !p-0",
           isFullScreen
             ? "w-screen max-w-none sm:max-w-none inset-0 h-screen"
-            : "sm:max-w-lg"
+            : "w-full sm:max-w-lg lg:!max-w-xl xl:!max-w-2xl"
         )}
       >
         <button
