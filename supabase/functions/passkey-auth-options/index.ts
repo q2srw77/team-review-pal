@@ -47,6 +47,8 @@ Deno.serve(async (req) => {
       allowCredentials,
     })
 
+    console.log('auth-options', { email, rpID, allowCount: allowCredentials.length })
+
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
     await admin.from('passkey_challenges').insert({
       email: email || null,
