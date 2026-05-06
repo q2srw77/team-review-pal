@@ -161,8 +161,8 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Review Requests</h2>
             <p className="text-sm text-muted-foreground mt-1">{requests.length} {view} requests</p>
@@ -170,17 +170,19 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
           <RequestForm onCreated={fetchRequests} />
         </div>
 
-        <div className="flex gap-2 mb-4">
+        <div className="inline-flex rounded-lg border border-border bg-card p-1 mb-4">
           <Button
-            variant={view === "active" ? "default" : "outline"}
+            variant={view === "active" ? "default" : "ghost"}
             size="sm"
+            className="rounded-md"
             onClick={() => setView("active")}
           >
             Active ({activeRequests.length})
           </Button>
           <Button
-            variant={view === "completed" ? "default" : "outline"}
+            variant={view === "completed" ? "default" : "ghost"}
             size="sm"
+            className="rounded-md"
             onClick={() => setView("completed")}
           >
             Completed ({completedRequests.length})
@@ -194,7 +196,7 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
             <p className="text-sm text-muted-foreground mt-1">Submit the first one to get started.</p>
           </Card>
         ) : (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
