@@ -1,35 +1,30 @@
-# Paginate Active & Completed lists
+## Goal
 
-Add client-side pagination beneath the requests table, defaulting to 25 rows per page with options for 50 and 100.
+Make the **Details** column in Settings → Audit Logs readable instead of raw JSON, and let users open a full-screen view with all details for any log entry.
 
-## What changes
+## Changes (single file: `src/components/settings/AuditLogs.tsx`)
 
-A pagination footer appears below the requests table (inside the same card or directly under it) showing:
+### 1. Human-readable summary in the Details column
+Replace the truncated `JSON.stringify(...)` with a friendly one-line summary built from the known fields:
+- `title` → shown first (e.g. "ZTNA Readable Demo")
+- `platform` → "on Storylane"
+- `new_status` → "→ completed" (formatted, with underscores replaced)
+- `reason` → "(deadline reached)"
+- `completed / total` → "2 of 3 completed" for `auto_closed`
+- Unknown keys → fall back to `key: value` pairs
 
-- **Left**: "Showing X–Y of Z" (e.g. "Showing 1–25 of 137"). Reflects the currently filtered list, not the unfiltered total.
-- **Center / right**: Page navigation — Previous, page indicator ("Page 2 of 6"), Next. Buttons disable at the ends.
-- **Right**: "Rows per page" select with options 25 (default), 50, 100.
+Still truncate to a single line; show a subtle "View details" link/button at the end (or make the cell clickable) when there's more to show.
 
-## Behavior
+### 2. Full-screen details dialog
+Add a `Dialog` (using existing `@/components/ui/dialog`) opened per row. Content:
+- Header: action badge + entity type + timestamp + user
+- **Summary** section: the same readable key/value pairs rendered as a definition list (label → value), with status/reason values formatted nicely
+- **Raw JSON** section (collapsible via `Collapsible`): pretty-printed `JSON.stringify(details, null, 2)` in a `<pre>` with monospace font and scroll
+- Use `max-w-3xl` (or `max-w-4xl`) and `max-h-[85vh]` with internal scroll so it feels full-screen on desktop and fills the viewport on mobile
 
-- Pagination is purely client-side, slicing the existing `requests` (already filtered) array.
-- Page resets to 1 whenever filters change (search, platform, status), the tab changes (Active/Completed), or the page-size changes.
-- If the current page becomes out of range after a data refresh (e.g. items removed), clamp to the last valid page.
-- Hide the footer entirely when total ≤ current page size and total ≤ 25 (no need to show controls for trivial lists). Always show the "Showing X of Y" text when there is at least 1 row.
-- Layout: stacks on mobile (`flex-col gap-2`), single row on `sm+` with `justify-between`.
-
-## Files to modify
-
-- `src/pages/Dashboard.tsx`
-  - Add state: `page` (number), `pageSize` (25 | 50 | 100).
-  - Add `useEffect` to reset `page` to 1 on filter/tab/pageSize changes.
-  - Derive `pagedRequests` via `useMemo`, render those in the table body instead of `requests`.
-  - Render a `<PaginationFooter>` block (inline JSX, no new file needed) below the table.
-
-No new dependencies — uses existing `Button` and `Select` components.
+### 3. Row interaction
+- Make the Details cell render the summary plus a small "View" button (ghost, `size="sm"`, `Eye` icon from lucide) that opens the dialog
+- Disable the button when `details` is null
 
 ## Out of scope
-
-- Server-side pagination.
-- Persisting page size across sessions.
-- URL-synced pagination state.
+No DB changes, no other settings sections, no changes to how logs are written.
