@@ -152,7 +152,9 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      await supabase.from("team_members").delete().eq("user_id", user_id);
       await supabase.from("user_roles").delete().eq("user_id", user_id);
+      await supabase.from("profiles").delete().eq("user_id", user_id);
       const { error } = await supabase.auth.admin.deleteUser(user_id);
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
