@@ -1,0 +1,2 @@
+ALTER TABLE public.platforms ADD COLUMN position_label text NOT NULL DEFAULT 'None' CHECK (position_label IN ('None','Slide','Step','Page'));
+ALTER TABLE public.request_notes ADD COLUMN position_number int NULL CHECK (position_number IS NULL OR (position_number >= 1 AND position_number <= 999));
