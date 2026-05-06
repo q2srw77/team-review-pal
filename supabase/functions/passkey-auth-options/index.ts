@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { generateAuthenticationOptions } from 'npm:@simplewebauthn/server@10'
+import { generateAuthenticationOptions } from 'npm:@simplewebauthn/server@11'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
