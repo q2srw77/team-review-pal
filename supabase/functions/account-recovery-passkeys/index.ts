@@ -118,12 +118,15 @@ Deno.serve(async (req) => {
 
     // 5) audit log (best effort)
     try {
+      const { data: prof } = await admin
+        .from('profiles').select('full_name, email').eq('user_id', row.user_id).maybeSingle()
       await admin.from('audit_logs').insert({
-        actor_user_id: row.user_id,
+        user_id: row.user_id,
+        user_name: prof?.full_name || prof?.email || '',
         action: 'account_recovery_passkeys_removed',
-        target_type: 'user',
-        target_id: row.user_id,
-        metadata: { method: 'recovery_code' },
+        entity_type: 'user',
+        entity_id: row.user_id,
+        details: { method: 'recovery_code' },
       })
     } catch (e) {
       console.warn('account-recovery-passkeys: audit log failed', e)
