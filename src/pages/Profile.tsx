@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Users, KeyRound, UserCircle } from "lucide-react";
 import { toast } from "sonner";
+import PasskeySettings from "@/components/profile/PasskeySettings";
 
 interface TeamRow {
   team_id: string;
