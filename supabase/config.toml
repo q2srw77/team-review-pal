@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.passkey-auth-verify]
 verify_jwt = false
+
+[functions.account-recovery-passkeys]
+verify_jwt = false
