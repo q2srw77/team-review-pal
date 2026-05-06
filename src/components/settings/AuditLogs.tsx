@@ -85,12 +85,23 @@ export default function AuditLogs() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [actionFilter, setActionFilter] = useState("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<AuditLog | null>(null);
   const [showRaw, setShowRaw] = useState(false);
 
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   useEffect(() => {
     fetchLogs();
-  }, [page, actionFilter]);
+  }, [page, actionFilter, search]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -102,6 +113,13 @@ export default function AuditLogs() {
 
     if (actionFilter !== "all") {
       query = query.eq("action", actionFilter);
+    }
+
+    if (search) {
+      const escaped = search.replace(/[%,()]/g, " ");
+      query = query.or(
+        `action.ilike.%${escaped}%,entity_type.ilike.%${escaped}%,user_name.ilike.%${escaped}%`
+      );
     }
 
     const { data, count } = await query;
