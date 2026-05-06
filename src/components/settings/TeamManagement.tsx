@@ -517,7 +517,10 @@ export default function TeamManagement() {
                 </ScrollArea>
                 <div className="border-t p-3 bg-muted/20">
                   <Button
-                    onClick={() => removeMembersByUserIds(selectedAssigned)}
+                    onClick={() => setRemoveConfirm({
+                      userIds: selectedAssigned,
+                      label: `${selectedAssigned.length} member${selectedAssigned.length === 1 ? "" : "s"}`,
+                    })}
                     disabled={selectedAssigned.length === 0}
                     variant="destructive"
                     size="sm"
