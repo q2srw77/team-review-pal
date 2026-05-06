@@ -54,11 +54,29 @@ export default function ResetPassword() {
       const { data, error } = await supabase.functions.invoke("confirm-password-reset", {
         body: { token, code, newPassword: password },
       });
-      if (error || (data as any)?.error) {
-        const msg = (data as any)?.error || "Reset failed";
-        toast({ title: msg, variant: "destructive" });
+
+      // Extract server-provided error message from either shape
+      let serverError: string | null = null;
+      if (error) {
+        try {
+          const ctx = (error as any)?.context;
+          if (ctx && typeof ctx.json === "function") {
+            const parsed = await ctx.json();
+            serverError = parsed?.error ?? null;
+          }
+        } catch {
+          // ignore parse errors
+        }
+        if (!serverError) serverError = (error as any)?.message || "Reset failed";
+      } else if (data && (data as any).ok === false) {
+        serverError = (data as any).error || "Reset failed";
+      }
+
+      if (serverError) {
+        toast({ title: serverError, variant: "destructive" });
         return;
       }
+
       toast({ title: "Password updated", description: "You can now sign in with your new password." });
       navigate("/", { replace: true });
     } catch (err: any) {
