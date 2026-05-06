@@ -127,9 +127,36 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
     setDetailOpen(true);
   };
 
+  const [search, setSearch] = useState("");
+  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Reset status filter when switching tabs (options differ)
+  useEffect(() => { setStatusFilter("all"); }, [view]);
+
   const activeRequests = allRequests.filter((r) => r.status === "pending" || r.status === "in_review");
   const completedRequests = allRequests.filter((r) => r.status === "completed");
-  const requests = view === "active" ? activeRequests : completedRequests;
+  const baseRequests = view === "active" ? activeRequests : completedRequests;
+
+  const platformOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of allRequests) if (r.platform) set.add(r.platform);
+    return Array.from(set).sort();
+  }, [allRequests]);
+
+  const requests = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return baseRequests.filter((r) => {
+      if (q && !r.title.toLowerCase().includes(q)) return false;
+      if (platformFilter !== "all" && r.platform !== platformFilter) return false;
+      if (view === "active" && statusFilter !== "all" && r.status !== statusFilter) return false;
+      return true;
+    });
+  }, [baseRequests, search, platformFilter, statusFilter, view]);
+
+  const filtersActive = search.trim() !== "" || platformFilter !== "all" || (view === "active" && statusFilter !== "all");
+  const clearFilters = () => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); };
+
 
   return (
     <div className="min-h-screen bg-background">
