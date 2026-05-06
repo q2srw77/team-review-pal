@@ -203,9 +203,22 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
                 : "You'll be prompted by your device to register a new passkey."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="passkey-label">Device name</Label>
+            <Input
+              id="passkey-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="My MacBook"
+              maxLength={80}
+              autoFocus
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRegister}>Continue</AlertDialogAction>
+            <AlertDialogAction onClick={handleRegister} disabled={!label.trim()}>
+              Continue
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
