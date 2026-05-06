@@ -96,12 +96,32 @@ Deno.serve(async (req) => {
       profiles?.forEach((p: any) => reviewerNames.set(p.user_id, p.full_name))
     }
 
+    // Fetch platform position label
+    let positionLabel = 'None'
+    if (request.platform) {
+      const { data: platformRow } = await supabase
+        .from('platforms')
+        .select('position_label')
+        .eq('name', request.platform)
+        .maybeSingle()
+      positionLabel = (platformRow as { position_label?: string } | null)?.position_label ?? 'None'
+    }
+
     // Fetch reviewer notes
-    const { data: notes } = await supabase
+    const { data: notesRaw } = await supabase
       .from('request_notes')
-      .select('content, created_at, author_id')
+      .select('content, created_at, author_id, position_number')
       .eq('request_id', request_id)
       .order('created_at', { ascending: true })
+
+    const notes = positionLabel !== 'None'
+      ? [...(notesRaw ?? [])].sort((a: any, b: any) => {
+          const ax = a.position_number ?? Number.MAX_SAFE_INTEGER
+          const bx = b.position_number ?? Number.MAX_SAFE_INTEGER
+          if (ax !== bx) return ax - bx
+          return String(a.created_at).localeCompare(String(b.created_at))
+        })
+      : (notesRaw ?? [])
 
     const noteAuthorIds = [...new Set(notes?.map((n: any) => n.author_id) ?? [])]
     let noteAuthorNames = new Map<string, string>()
