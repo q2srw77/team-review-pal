@@ -80,9 +80,11 @@ export default function RequestDetail({
   const { toast } = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
+  const [newNotePosition, setNewNotePosition] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitterName, setSubmitterName] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [positionLabel, setPositionLabel] = useState<PositionLabel>("None");
   const [reviewerStatuses, setReviewerStatuses] = useState<ReviewerStatus[]>([]);
 
   // Edit mode state
