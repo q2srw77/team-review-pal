@@ -46,14 +46,17 @@ Deno.serve(async (req) => {
     })
   }
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const token = authHeader.replace('Bearer ', '')
-  let isServiceRole = false
-  try {
-    const payloadB64 = token.split('.')[1]
-    const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
-    const payload = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')))
-    isServiceRole = payload?.role === 'service_role'
-  } catch { /* fall through to user check */ }
+  let isServiceRole = token === serviceRoleKey
+  if (!isServiceRole) {
+    try {
+      const payloadB64 = token.split('.')[1]
+      const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
+      const payload = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')))
+      isServiceRole = payload?.role === 'service_role'
+    } catch { /* fall through to user check */ }
+  }
 
   if (!isServiceRole) {
     const tmpClient = createClient(Deno.env.get('SUPABASE_URL')!, anonKey, {
