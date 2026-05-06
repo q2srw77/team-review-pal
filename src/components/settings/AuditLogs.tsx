@@ -16,7 +16,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronLeft, ChevronRight, Eye, ChevronDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight, Eye, ChevronDown, Search, X } from "lucide-react";
 import { format } from "date-fns";
 
 interface AuditLog {
@@ -84,12 +85,23 @@ export default function AuditLogs() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [actionFilter, setActionFilter] = useState("all");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<AuditLog | null>(null);
   const [showRaw, setShowRaw] = useState(false);
 
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
   useEffect(() => {
     fetchLogs();
-  }, [page, actionFilter]);
+  }, [page, actionFilter, search]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -103,6 +115,13 @@ export default function AuditLogs() {
       query = query.eq("action", actionFilter);
     }
 
+    if (search) {
+      const escaped = search.replace(/[%,()]/g, " ");
+      query = query.or(
+        `action.ilike.%${escaped}%,entity_type.ilike.%${escaped}%,user_name.ilike.%${escaped}%`
+      );
+    }
+
     const { data, count } = await query;
     setLogs((data as AuditLog[]) ?? []);
     setTotal(count ?? 0);
@@ -113,20 +132,41 @@ export default function AuditLogs() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 className="text-xl font-bold tracking-tight">Audit Logs</h2>
-        <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); setPage(0); }}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Filter by action" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Actions</SelectItem>
-            <SelectItem value="created">Created</SelectItem>
-            <SelectItem value="updated">Updated</SelectItem>
-            <SelectItem value="deleted">Deleted</SelectItem>
-            <SelectItem value="review_status_changed">Status Changed</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search action, entity, or user…"
+              className="pl-8 pr-8 h-9"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); setPage(0); }}>
+            <SelectTrigger className="w-full sm:w-48 h-9">
+              <SelectValue placeholder="Filter by action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Actions</SelectItem>
+              <SelectItem value="created">Created</SelectItem>
+              <SelectItem value="updated">Updated</SelectItem>
+              <SelectItem value="deleted">Deleted</SelectItem>
+              <SelectItem value="review_status_changed">Status Changed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="border rounded-lg">
