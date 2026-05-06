@@ -36,6 +36,7 @@ interface Note {
   id: string;
   content: string;
   created_at: string;
+  author_id: string;
   author_name: string;
   position_number: number | null;
 }
@@ -82,6 +83,10 @@ export default function RequestDetail({
   const [newNote, setNewNote] = useState("");
   const [newNotePosition, setNewNotePosition] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteContent, setEditNoteContent] = useState("");
+  const [editNotePosition, setEditNotePosition] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   const [submitterName, setSubmitterName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [positionLabel, setPositionLabel] = useState<PositionLabel>("None");
@@ -277,6 +282,7 @@ export default function RequestDetail({
         id: n.id,
         content: n.content,
         created_at: n.created_at,
+        author_id: n.author_id,
         author_name: nameMap.get(n.author_id) ?? "Unknown",
         position_number: n.position_number,
       }))
@@ -307,6 +313,43 @@ export default function RequestDetail({
     } else {
       setNewNote("");
       setNewNotePosition("");
+      fetchNotes();
+    }
+  };
+
+  const startEditNote = (note: Note) => {
+    setEditingNoteId(note.id);
+    setEditNoteContent(note.content);
+    setEditNotePosition(note.position_number != null ? String(note.position_number) : "");
+  };
+
+  const cancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditNoteContent("");
+    setEditNotePosition("");
+  };
+
+  const saveEditNote = async (noteId: string) => {
+    if (!editNoteContent.trim()) return;
+    let positionNumber: number | null = null;
+    if (positionLabel !== "None") {
+      const n = parseInt(editNotePosition, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 999) {
+        toast({ title: "Number required", description: `Enter a ${positionLabel.toLowerCase()} number (1–999).`, variant: "destructive" });
+        return;
+      }
+      positionNumber = n;
+    }
+    setSavingNote(true);
+    const { error } = await supabase
+      .from("request_notes")
+      .update({ content: editNoteContent.trim(), position_number: positionNumber })
+      .eq("id", noteId);
+    setSavingNote(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      cancelEditNote();
       fetchNotes();
     }
   };
@@ -657,16 +700,67 @@ export default function RequestDetail({
                 <div key={note.id} className="bg-secondary/40 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-1 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      {positionLabel !== "None" && note.position_number != null && (
+                      {positionLabel !== "None" && note.position_number != null && editingNoteId !== note.id && (
                         <Badge variant="outline" className="text-[10px] uppercase tracking-wide shrink-0">
                           {positionLabel} {note.position_number}
                         </Badge>
                       )}
                       <span className="font-medium text-sm text-foreground truncate">{note.author_name}</span>
                     </div>
-                    <span className="text-xs text-muted-foreground shrink-0">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
+                      {user?.id === note.author_id && request.status !== "completed" && editingNoteId !== note.id && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6"
+                          onClick={() => startEditNote(note)}
+                          aria-label="Edit note"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm">{note.content}</p>
+                  {editingNoteId === note.id ? (
+                    <div className="space-y-2">
+                      {positionLabel !== "None" && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">{positionLabel} #</span>
+                          <Input
+                            value={editNotePosition}
+                            onChange={(e) => setEditNotePosition(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                            inputMode="numeric"
+                            maxLength={3}
+                            placeholder="1-999"
+                            className="h-8 w-24"
+                          />
+                        </div>
+                      )}
+                      <Textarea
+                        value={editNoteContent}
+                        onChange={(e) => setEditNoteContent(e.target.value)}
+                        rows={2}
+                        maxLength={2000}
+                      />
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => saveEditNote(note.id)}
+                          disabled={savingNote || !editNoteContent.trim() || (positionLabel !== "None" && !editNotePosition)}
+                        >
+                          <Save className="w-3.5 h-3.5 mr-1.5" />
+                          {savingNote ? "Saving…" : "Save"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={cancelEditNote} disabled={savingNote}>
+                          <X className="w-3.5 h-3.5 mr-1.5" />
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                  )}
                 </div>
               ))}
             </div>
