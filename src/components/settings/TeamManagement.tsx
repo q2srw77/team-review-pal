@@ -71,6 +71,7 @@ export default function TeamManagement() {
   const [availableSearch, setAvailableSearch] = useState("");
   const [assignedSearch, setAssignedSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState<{ userIds: string[]; label: string } | null>(null);
 
   const fetchTeams = useCallback(async () => {
     setLoading(true);
@@ -497,7 +498,13 @@ export default function TeamManagement() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                              onClick={(e) => { e.stopPropagation(); removeMembersByUserIds([m.user_id]); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRemoveConfirm({
+                                  userIds: [m.user_id],
+                                  label: m.profile?.full_name || m.profile?.email || "this member",
+                                });
+                              }}
                               title="Remove from team"
                             >
                               <X className="w-4 h-4" />
@@ -510,7 +517,10 @@ export default function TeamManagement() {
                 </ScrollArea>
                 <div className="border-t p-3 bg-muted/20">
                   <Button
-                    onClick={() => removeMembersByUserIds(selectedAssigned)}
+                    onClick={() => setRemoveConfirm({
+                      userIds: selectedAssigned,
+                      label: `${selectedAssigned.length} member${selectedAssigned.length === 1 ? "" : "s"}`,
+                    })}
                     disabled={selectedAssigned.length === 0}
                     variant="destructive"
                     size="sm"
@@ -529,6 +539,35 @@ export default function TeamManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Remove Member Confirmation */}
+      <AlertDialog open={!!removeConfirm} onOpenChange={(o) => { if (!o) setRemoveConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove {removeConfirm?.label}{membersTarget ? ` from ${membersTarget.name}` : ""}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              They will lose access to this team's review requests. This can be undone by re-adding them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (removeConfirm) {
+                  await removeMembersByUserIds(removeConfirm.userIds);
+                }
+                setRemoveConfirm(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
     </div>
   );
