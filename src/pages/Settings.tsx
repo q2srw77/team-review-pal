@@ -60,8 +60,8 @@ export default function Settings({ onBack }: { onBack: () => void }) {
         </Sidebar>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="sticky top-0 z-30 bg-card border-b border-border">
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
+          <header className="sticky top-0 z-30 bg-card/80 backdrop-blur border-b border-border shadow-sm">
+            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 h-14 sm:h-16 flex items-center gap-3">
               <SidebarTrigger className="-ml-1" />
               <Button variant="ghost" size="icon" onClick={onBack}>
                 <ArrowLeft className="w-5 h-5" />
@@ -73,7 +73,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
             </div>
           </header>
 
-          <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 w-full">
+          <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8 w-full">
             {active === "users" && <UserManagement />}
             {active === "teams" && <TeamManagement />}
             {active === "platforms" && <PlatformManagement />}
