@@ -1,29 +1,32 @@
-## Goal
+## Problem
 
-Add a Full Screen toggle to the review detail panel (the side sheet that opens when a review is clicked), placed immediately to the left of the existing X-close button in the top-right corner.
+In full-screen mode the close (X) and full-screen toggle buttons are absolutely positioned inside `SheetContent`, which is itself the scroll container. As the user scrolls the long review content, those controls scroll out of view, and the title header also disappears.
 
-## Changes
+## Fix
 
-**`src/components/RequestDetail.tsx`**
-- Add local `isFullScreen` state, defaulting to `false`. Reset to `false` whenever the sheet closes or a different request is selected.
-- Apply a conditional className on `<SheetContent>`:
-  - Default (current): `sm:max-w-lg overflow-y-auto`
-  - Full screen: override width/positioning so the panel fills the viewport (e.g. `!max-w-none w-screen h-screen sm:max-w-none inset-0`).
-- Render a new icon button absolutely positioned at `top-4 right-12` (just left of the built-in X at `right-4`), using lucide `Maximize2` / `Minimize2` icons that toggle `isFullScreen`. Style matches the existing close button (ghost, small, `h-7 w-7`).
-- Add an `aria-label` ("Enter full screen" / "Exit full screen") and a tooltip-equivalent `title` for accessibility.
+Restructure `SheetContent` in `src/components/RequestDetail.tsx` into a non-scrolling shell with a sticky/fixed header strip and a separately scrollable body.
+
+**`SheetContent`**
+- Remove `overflow-y-auto` from `SheetContent`. Add `flex flex-col` and remove default `p-6` (use `!p-0`) so we control padding per section.
+- Full-screen sizing: keep `w-screen max-w-none sm:max-w-none` plus `h-screen` and `inset-0` so it truly fills the viewport.
+- Default (side panel) sizing unchanged: `sm:max-w-lg`, full-height already provided by sheet variant.
+
+**Header strip (always visible)**
+- A new top bar wrapper with `shrink-0 border-b bg-background px-6 pt-6 pb-4` containing the existing `SheetHeader` content (title, Edit/Save/Cancel).
+- Keep the full-screen toggle button absolutely positioned at `right-12 top-4` and rely on the built-in close at `right-4 top-4`. Both now sit over the non-scrolling header so they remain visible at all times.
+- Remove the `pr-8` hack and instead use `pr-20` on the title row so the title never slides under the two corner buttons.
+
+**Scrollable body**
+- Wrap the existing content (everything currently after `</SheetHeader>`, starting at the `<div className="mt-6 space-y-5">`) in a new `<div className="flex-1 overflow-y-auto px-6 py-6">`.
+- Remove `mt-6` from the inner container since padding now lives on the scroll wrapper.
+
+## Result
+
+- Title, Edit/Save controls, X-close, and Full Screen toggle stay pinned at the top in both windowed and full-screen modes.
+- Long content scrolls inside the body region without ever hiding the controls.
+- No business-logic or data changes — purely layout.
 
 ## Out of scope
 
-- No changes to the underlying shadcn `Sheet` primitive.
-- No changes to content layout inside the sheet — when full screen, content simply has more horizontal room (existing internal sections remain stacked as today).
-- No persistence of the full-screen preference across sessions.
-
-## Visual reference
-
-```text
-┌──────────────────────────────── Review Detail ────────┐
-│                                       [⛶ Fullscreen] [✕]│
-│ Title …                                                │
-│ …                                                      │
-└────────────────────────────────────────────────────────┘
-```
+- No changes to the shadcn `Sheet` primitive.
+- No persistence of the full-screen preference.
