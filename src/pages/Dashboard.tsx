@@ -321,7 +321,7 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
                   </tr>
                 </thead>
                 <tbody>
-                  {requests.map((r) => (
+                  {pagedRequests.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => openDetail(r)}
