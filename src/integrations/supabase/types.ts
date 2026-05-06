@@ -134,6 +134,39 @@ export type Database = {
         }
         Relationships: []
       }
+      passkey_challenges: {
+        Row: {
+          challenge: string
+          created_at: string
+          email: string | null
+          expires_at: string
+          id: string
+          type: string
+          used_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          challenge: string
+          created_at?: string
+          email?: string | null
+          expires_at: string
+          id?: string
+          type: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          challenge?: string
+          created_at?: string
+          email?: string | null
+          expires_at?: string
+          id?: string
+          type?: string
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       password_reset_tokens: {
         Row: {
           attempts: number
@@ -194,6 +227,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          password_disabled: boolean
           updated_at: string
           user_id: string
         }
@@ -202,6 +236,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          password_disabled?: boolean
           updated_at?: string
           user_id: string
         }
@@ -210,6 +245,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          password_disabled?: boolean
           updated_at?: string
           user_id?: string
         }
@@ -441,6 +477,42 @@ export type Database = {
           description?: string
           id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      user_passkeys: {
+        Row: {
+          counter: number
+          created_at: string
+          credential_id: string
+          device_label: string
+          id: string
+          last_used_at: string | null
+          public_key: string
+          transports: string[]
+          user_id: string
+        }
+        Insert: {
+          counter?: number
+          created_at?: string
+          credential_id: string
+          device_label?: string
+          id?: string
+          last_used_at?: string | null
+          public_key: string
+          transports?: string[]
+          user_id: string
+        }
+        Update: {
+          counter?: number
+          created_at?: string
+          credential_id?: string
+          device_label?: string
+          id?: string
+          last_used_at?: string | null
+          public_key?: string
+          transports?: string[]
+          user_id?: string
         }
         Relationships: []
       }
