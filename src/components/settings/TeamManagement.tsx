@@ -498,7 +498,13 @@ export default function TeamManagement() {
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                              onClick={(e) => { e.stopPropagation(); removeMembersByUserIds([m.user_id]); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRemoveConfirm({
+                                  userIds: [m.user_id],
+                                  label: m.profile?.full_name || m.profile?.email || "this member",
+                                });
+                              }}
                               title="Remove from team"
                             >
                               <X className="w-4 h-4" />
