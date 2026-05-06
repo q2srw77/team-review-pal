@@ -23,6 +23,9 @@ Deno.serve(async (req) => {
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
+    const credentialId = String(response?.id || '')
+    console.log('auth-verify start', { rpID, origin, hasResponse: !!response, credentialId })
+
     const expectedChallenge = response?.response?.clientDataJSON
       ? JSON.parse(atob(response.response.clientDataJSON.replace(/-/g, '+').replace(/_/g, '/'))).challenge
       : null
@@ -35,16 +38,19 @@ Deno.serve(async (req) => {
       .eq('type', 'authentication')
       .maybeSingle()
 
+    console.log('auth-verify challenge', { found: !!ch, used: !!ch?.used_at, expired: ch ? new Date(ch.expires_at).getTime() < Date.now() : null })
+
     if (!ch || ch.used_at || new Date(ch.expires_at).getTime() < Date.now()) {
       return json(400, { error: 'Challenge invalid or expired' })
     }
 
-    const credentialId = String(response?.id || '')
     const { data: key } = await admin
       .from('user_passkeys')
       .select('id, user_id, public_key, counter, transports')
       .eq('credential_id', credentialId)
       .maybeSingle()
+
+    console.log('auth-verify credential lookup', { found: !!key, userId: key?.user_id })
 
     if (!key) return json(400, { error: 'Unknown passkey' })
 
@@ -62,6 +68,8 @@ Deno.serve(async (req) => {
         transports: (key.transports ?? []) as AuthenticatorTransport[],
       },
     })
+
+    console.log('auth-verify webauthn', { verified: verification.verified, newCounter: verification.authenticationInfo?.newCounter })
 
     if (!verification.verified) return json(400, { error: 'Verification failed' })
 
