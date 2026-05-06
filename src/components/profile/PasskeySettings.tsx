@@ -15,7 +15,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Fingerprint, Trash2 } from "lucide-react";
+import { Fingerprint, Pencil, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { passkeysSupported, registerPasskey } from "@/lib/passkeys";
 
@@ -34,6 +35,36 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
   const [submitting, setSubmitting] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [showSetupConfirm, setShowSetupConfirm] = useState(false);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
+
+  const openRename = (k: PasskeyRow) => {
+    setRenameId(k.id);
+    setRenameValue(k.device_label);
+  };
+
+  const handleRename = async () => {
+    if (!renameId) return;
+    const newLabel = renameValue.trim().slice(0, 80);
+    if (!newLabel) {
+      toast.error("Name cannot be empty");
+      return;
+    }
+    setRenaming(true);
+    const { error } = await supabase
+      .from("user_passkeys")
+      .update({ device_label: newLabel })
+      .eq("id", renameId);
+    setRenaming(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Passkey renamed");
+    setRenameId(null);
+    await load();
+  };
 
   const load = async () => {
     if (!user) return;
@@ -132,9 +163,14 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
                     {k.last_used_at ? ` · Last used ${new Date(k.last_used_at).toLocaleDateString()}` : ""}
                   </p>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setConfirmId(k.id)} aria-label="Remove passkey">
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" onClick={() => openRename(k)} aria-label="Rename passkey">
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => setConfirmId(k.id)} aria-label="Remove passkey">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -198,6 +234,30 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!renameId} onOpenChange={(o) => !o && setRenameId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename passkey</DialogTitle>
+            <DialogDescription>Give this passkey a name you'll recognize.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            maxLength={80}
+            placeholder="My MacBook"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameId(null)} disabled={renaming}>
+              Cancel
+            </Button>
+            <Button onClick={handleRename} disabled={renaming || !renameValue.trim()}>
+              {renaming ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
