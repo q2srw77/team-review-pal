@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ClipboardCheck } from "lucide-react";
+import { ClipboardCheck, Fingerprint } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ForgotPasswordForm from "@/components/ForgotPasswordForm";
+import { passkeysSupported, signInWithPasskey } from "@/lib/passkeys";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const { signIn } = useAuth();
   const { toast } = useToast();
@@ -20,11 +23,44 @@ export default function Login() {
     e.preventDefault();
     setSubmitting(true);
     try {
+      // Check if account is passkey-only
+      const trimmed = email.trim().toLowerCase();
+      if (trimmed) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("password_disabled")
+          .eq("email", trimmed)
+          .maybeSingle();
+        if (profile?.password_disabled) {
+          toast({
+            title: "This account uses a passkey",
+            description: "Please sign in with your passkey instead.",
+            variant: "destructive",
+          });
+          setSubmitting(false);
+          return;
+        }
+      }
       await signIn(email, password);
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handlePasskey = async () => {
+    if (!email.trim()) {
+      toast({ title: "Enter your email first", variant: "destructive" });
+      return;
+    }
+    setPasskeyLoading(true);
+    try {
+      await signInWithPasskey(email.trim().toLowerCase());
+    } catch (err: any) {
+      toast({ title: "Passkey sign-in failed", description: err?.message ?? "", variant: "destructive" });
+    } finally {
+      setPasskeyLoading(false);
     }
   };
 
@@ -63,6 +99,18 @@ export default function Login() {
               <Button type="submit" className="w-full" disabled={submitting}>
                 {submitting ? "Signing in…" : "Sign in"}
               </Button>
+              {passkeysSupported() && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={handlePasskey}
+                  disabled={passkeyLoading}
+                >
+                  <Fingerprint className="w-4 h-4 mr-2" />
+                  {passkeyLoading ? "Waiting for passkey…" : "Sign in with Passkey"}
+                </Button>
+              )}
             </form>
           ) : (
             <ForgotPasswordForm onBack={() => setMode("signin")} />

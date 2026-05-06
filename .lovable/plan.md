@@ -1,50 +1,87 @@
-## Problem
+# Add Passkey Authentication
 
-The `confirm-password-reset` edge function returns errors as non-2xx HTTP responses. When the frontend calls it via `supabase.functions.invoke`, the JS SDK treats any non-2xx response as a thrown `FunctionsHttpError` — `data` is `null` and the actual error message lives on `error.context.json()`, not on `data.error`. As a result, users see a generic "Reset failed" toast instead of the real reason ("Invalid verification code", "Invalid or expired reset request", etc.), and it's hard to tell whether the password actually got updated.
+Passkeys (WebAuthn / FIDO2) let users sign in with Touch ID, Face ID, Windows Hello, or a hardware key instead of a password. Lovable Cloud's auth does not support passkeys natively, so we build it on top using two edge functions and the browser's WebAuthn API. Once a user enrolls a passkey, password sign‑in is disabled for that account.
 
-There are also a few smaller correctness issues:
+## User Experience
 
-- `attempts` is incremented with a non-atomic read → write, so concurrent submissions can under-count.
-- A bad code that lands exactly at attempt #5 returns "Invalid verification code" but does not lock the token; the next attempt slips through the `attempts >= 5` check inconsistently.
-- After max attempts the token is marked `used_at` but the response still says only "Invalid verification code", which is misleading.
-- The frontend doesn't surface server messages from `error.context`, and on success it routes to `/` even though the user is not signed in (Login lives at `/`, but the success state is unclear).
+**My Profile → new "Passkey" card**
+- If no passkey: "Set up Passkey" button. Click → browser prompts for biometrics/security key → success toast. A warning is shown first: *"After setup, you'll sign in with your passkey instead of a password."*
+- If a passkey exists: shows device label, created date, last used date. Buttons: "Add another passkey", "Remove passkey".
+- Removing the last passkey re-enables password sign‑in (with a confirmation dialog).
+- The existing "Change Password" card is hidden once any passkey is registered.
 
-## Fix Plan
+**Login screen**
+- Email field + two buttons: **"Sign in with Passkey"** (primary) and **"Use password"** (secondary).
+- Flow: user types email → clicks Passkey → browser shows passkey picker → signed in.
+- If the email has a passkey registered, password sign-in returns: *"This account uses a passkey. Please sign in with your passkey."*
+- "Forgot password?" stays available, but if the account has a passkey it triggers the passkey reset path (request a new passkey enrollment via emailed magic link instead of password reset).
 
-### 1. `supabase/functions/confirm-password-reset/index.ts`
-- Always return HTTP **200** with `{ ok: false, error: "…" }` for validation/expected failures so `supabase.functions.invoke` delivers the message in `data` instead of throwing. Reserve non-2xx for true server errors (DB/auth admin failures).
-- Use a single atomic update for the failed-attempt counter:
-  - `update password_reset_tokens set attempts = attempts + 1, used_at = case when attempts + 1 >= 5 then now() else used_at end where id = … returning attempts, used_at` — then branch on the returned values.
-- Return distinct, user-friendly errors:
-  - `"This reset link is invalid or has expired."` (no row, expired, already used)
-  - `"Incorrect verification code. {n} attempts remaining."` (wrong code, attempts < 5)
-  - `"Too many incorrect attempts. Please request a new reset link."` (attempts hit 5 → token locked)
-  - `"Could not update password. Please try again."` (admin update failure)
-- Validate `newPassword` strength server-side (already present) and confirm `auth.admin.updateUserById` succeeded before marking the token used.
-- After a successful password update: mark current token used AND invalidate other unused tokens for that user (already present — keep, but only do it after the password update returns no error).
-- Add structured `console.log` lines for: token lookup hit/miss, attempt count, update success — to make future debugging via edge logs straightforward.
+## Architecture
 
-### 2. `src/pages/ResetPassword.tsx`
-- Update the response handling to read both shapes:
-  - If `error` is a `FunctionsHttpError`, attempt `await error.context.json()` to extract `{ error }`.
-  - Otherwise read `data.ok` / `data.error`.
-- Show the real server message in the toast (fallback to a generic one).
-- On success: show the success toast and redirect to `/` (Login). Keep the existing redirect — Login is already mounted at `/`.
-- Disable the submit button while `submitting` (already done) and also when `code.length !== 6` to reduce server round-trips.
+```text
+Browser (WebAuthn API)
+   │  navigator.credentials.create() / .get()
+   ▼
+Edge Functions (public, no JWT)
+   ├── passkey-register-options   → returns challenge + user info
+   ├── passkey-register-verify    → stores credential, disables password
+   ├── passkey-auth-options       → returns challenge + allowCredentials
+   └── passkey-auth-verify        → verifies signature, mints Supabase session
+   ▼
+DB: user_passkeys, passkey_challenges
+```
 
-### 3. Validation
-- Manually call the deployed edge function with `supabase--curl_edge_functions` against four scenarios and confirm responses:
-  1. Missing token → `{ ok: false, error: "This reset link is invalid or has expired." }` (HTTP 200)
-  2. Valid token + wrong code → `{ ok: false, error: "Incorrect verification code. N attempts remaining." }` (HTTP 200)
-  3. 5 wrong codes in a row → final response is the "Too many incorrect attempts" message and the row's `used_at` is set
-  4. Valid token + valid code + valid password → `{ ok: true }`, and `auth.users` for that user has an updated password (verified by attempting login from the UI)
-- Check `supabase--edge_function_logs` after each call to confirm the structured logs.
-- Visually verify in the preview that the toast now shows the precise reason on each failure path.
+Library: `@simplewebauthn/server` (Deno-compatible) for challenge generation and signature verification. Browser side: `@simplewebauthn/browser`.
+
+## Database Changes
+
+New table `user_passkeys`:
+- `id uuid pk`, `user_id uuid`, `credential_id text unique`, `public_key bytea`, `counter bigint`, `transports text[]`, `device_label text`, `created_at`, `last_used_at`
+- RLS: users can SELECT/DELETE their own; service role manages all writes.
+
+New table `passkey_challenges` (short-lived, 5 min):
+- `id uuid pk`, `user_id uuid nullable`, `email text nullable`, `challenge text`, `type text` (`registration`|`authentication`), `expires_at`, `used_at`
+- RLS: service role only.
+
+New column on `profiles`: `password_disabled boolean default false`. When true, the password sign‑in path returns the friendly "use your passkey" error.
+
+## Sign-in Flow (how the session is created)
+
+WebAuthn verifies cryptographically that the user owns the private key. Once verified server-side, the edge function uses the service role to issue a Supabase session for that user via `auth.admin.generateLink({ type: 'magiclink' })` and then exchanges the resulting OTP/token for a session that the client stores. Alternative if cleaner: `auth.admin.createSession()` style — confirm during implementation which Supabase admin call yields a usable session token in the current SDK version. The choice is internal; UX is unchanged.
 
 ## Files
 
-**Edited**
-- `supabase/functions/confirm-password-reset/index.ts`
-- `src/pages/ResetPassword.tsx`
+**New**
+- `supabase/migrations/<ts>_add_passkeys.sql` — tables, RLS, `password_disabled` column.
+- `supabase/functions/passkey-register-options/index.ts`
+- `supabase/functions/passkey-register-verify/index.ts`
+- `supabase/functions/passkey-auth-options/index.ts`
+- `supabase/functions/passkey-auth-verify/index.ts`
+- `src/components/profile/PasskeySettings.tsx` — card for My Profile.
+- `src/components/PasskeyLoginButton.tsx` — used on Login.
+- `src/lib/passkeys.ts` — browser-side helpers wrapping `@simplewebauthn/browser`.
 
-No DB schema, RLS, or other function changes are required.
+**Edited**
+- `src/pages/Profile.tsx` — mount `PasskeySettings`, hide password card when passkey exists.
+- `src/pages/Login.tsx` — add passkey button, show "use passkey" message when applicable.
+- `src/components/ForgotPasswordForm.tsx` — branch when account is passkey-only.
+- `supabase/config.toml` — `verify_jwt = false` for the four new functions (register/options public; verify functions validate the user's JWT or the registration challenge themselves).
+- `supabase/functions/setup-admin/index.ts` — no change needed.
+
+**Dependency**
+- Add `@simplewebauthn/browser` to the frontend (`bun add`).
+
+## Validation
+
+1. Enroll a passkey from Profile on desktop Chrome and iOS Safari; confirm row in `user_passkeys`, `password_disabled = true`.
+2. Sign out, sign in with passkey on Login; session is created and Dashboard loads.
+3. Try password sign‑in for the same account → see "use your passkey" message.
+4. Add a second passkey from another device; both listed in Profile.
+5. Remove the last passkey → password sign‑in works again.
+6. Confirm `passkey_challenges` rows expire / are marked `used_at` after each ceremony.
+7. Run `supabase--linter` and check edge logs are clean.
+
+## Open Questions
+
+1. **Recovery if a user loses their only passkey:** options are (a) email magic link that lets them enroll a new passkey, (b) keep password as a fallback always. The plan above assumes (a). Confirm preference.
+2. **Allow both passkey + password simultaneously?** Spec says passkey *replaces* password — implemented as such. Can be relaxed later.
