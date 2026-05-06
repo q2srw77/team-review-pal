@@ -278,6 +278,7 @@ export default function RequestDetail({
         id: n.id,
         content: n.content,
         created_at: n.created_at,
+        author_id: n.author_id,
         author_name: nameMap.get(n.author_id) ?? "Unknown",
         position_number: n.position_number,
       }))
