@@ -46,14 +46,25 @@ Deno.serve(async (req) => {
     })
   }
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
-  const tmpClient = createClient(Deno.env.get('SUPABASE_URL')!, anonKey, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { error: claimsErr } = await tmpClient.auth.getClaims(authHeader.replace('Bearer ', ''))
-  if (claimsErr) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  const token = authHeader.replace('Bearer ', '')
+  let isServiceRole = false
+  try {
+    const payloadB64 = token.split('.')[1]
+    const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
+    const payload = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')))
+    isServiceRole = payload?.role === 'service_role'
+  } catch { /* fall through to user check */ }
+
+  if (!isServiceRole) {
+    const tmpClient = createClient(Deno.env.get('SUPABASE_URL')!, anonKey, {
+      global: { headers: { Authorization: authHeader } },
     })
+    const { error: claimsErr } = await tmpClient.auth.getClaims(token)
+    if (claimsErr) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
