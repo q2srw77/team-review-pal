@@ -437,53 +437,56 @@ export default function RequestDetail({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         className={cn(
-          "overflow-y-auto",
+          "flex flex-col !p-0",
           isFullScreen
-            ? "w-screen max-w-none sm:max-w-none"
+            ? "w-screen max-w-none sm:max-w-none inset-0 h-screen"
             : "sm:max-w-lg"
         )}
       >
         <button
           type="button"
           onClick={() => setIsFullScreen((v) => !v)}
-          className="absolute right-12 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          className="absolute right-12 top-4 z-10 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           aria-label={isFullScreen ? "Exit full screen" : "Enter full screen"}
           title={isFullScreen ? "Exit full screen" : "Enter full screen"}
         >
           {isFullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>
-        <SheetHeader>
-          <div className="flex items-start justify-between gap-2 pr-8">
-            <SheetTitle className="text-xl flex-1">
-              {editing ? (
-                <Input
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="text-xl font-semibold"
-                />
-              ) : (
-                request.title
+        <div className="shrink-0 border-b bg-background px-6 pt-6 pb-4">
+          <SheetHeader>
+            <div className="flex items-start justify-between gap-2 pr-20">
+              <SheetTitle className="text-xl flex-1">
+                {editing ? (
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="text-xl font-semibold"
+                  />
+                ) : (
+                  request.title
+                )}
+              </SheetTitle>
+              {canEdit && !editing && (
+                <Button variant="ghost" size="sm" onClick={enterEditMode}>
+                  <Pencil className="w-4 h-4 mr-1" /> Edit
+                </Button>
               )}
-            </SheetTitle>
-            {canEdit && !editing && (
-              <Button variant="ghost" size="sm" onClick={enterEditMode}>
-                <Pencil className="w-4 h-4 mr-1" /> Edit
-              </Button>
-            )}
-            {editing && (
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                  <X className="w-4 h-4 mr-1" /> Cancel
-                </Button>
-                <Button size="sm" onClick={saveEdit} disabled={saving}>
-                  <Save className="w-4 h-4 mr-1" /> {saving ? "Saving…" : "Save"}
-                </Button>
-              </div>
-            )}
-          </div>
-        </SheetHeader>
+              {editing && (
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                    <X className="w-4 h-4 mr-1" /> Cancel
+                  </Button>
+                  <Button size="sm" onClick={saveEdit} disabled={saving}>
+                    <Save className="w-4 h-4 mr-1" /> {saving ? "Saving…" : "Save"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </SheetHeader>
+        </div>
 
-        <div className="mt-6 space-y-5">
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="space-y-5">
           {/* Meta */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
