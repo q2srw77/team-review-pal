@@ -1,66 +1,53 @@
+## Position Labels for Platforms + Numbered Reviewer Notes
 
+### Goal
+Let admins tag each platform with a position label (`Slide`, `Step`, `Page`, or `None`). When reviewers add a note on a request whose platform has a non-`None` label, they must enter a 1–3 digit number alongside the comment. Notes are then displayed (and exported) ordered by that number rather than by timestamp.
 
-## Investigation: Why the Auto-Close Didn't Fire
+### Database
+New column on `platforms`:
+- `position_label text not null default 'None'` with a CHECK constraint limiting values to `'None' | 'Slide' | 'Step' | 'Page'`.
 
-### What I found
+New column on `request_notes`:
+- `position_number int null` — stores the slide/step/page number (1–999). Null for notes on `None`-labeled platforms or legacy notes.
 
-| Component | Status |
-|---|---|
-| Cron job `auto-close-overdue-requests-hourly` | Active, running every hour |
-| Last 10 runs | All `succeeded`, HTTP 200 |
-| Function response | `{"processed":0,"results":[]}` every run |
-| Service-role auth gate | Working (no 401/403) |
-| Test request `Test Auto Close` | `complete_by = 2026-04-20`, status `in_review` |
-| Today (UTC) | `2026-04-20` |
+No data migration needed; existing rows default to `None` / `null`.
 
-### Root cause
+### Backend / Edge Functions
+`supabase/functions/generate-review-report/index.ts`:
+- Select `position_number` along with note fields.
+- When the request's platform has a non-`None` `position_label`, sort notes by `position_number ASC NULLS LAST, created_at ASC` and prefix each note's printed body with `"<Label> <n>: "`. Otherwise keep current `created_at ASC` ordering.
 
-The function uses a **strict less-than** comparison:
+(Auto-generated `types.ts` will update automatically after the migration — no manual edit.)
 
-```ts
-const today = new Date().toISOString().slice(0, 10);  // "2026-04-20"
-.lt("complete_by", today)                              // complete_by < today
-```
+### Frontend
 
-A request with `complete_by = 2026-04-20` is **not** less than `2026-04-20`, so it's skipped. It would only fire on **April 21 UTC** (tomorrow).
+**`src/components/settings/PlatformManagement.tsx`**
+- Show a `Position Label` column in the table.
+- Add a `Select` (Slide / Step / Page / None) to the Add and Edit dialogs; default `None`.
+- Persist `position_label` on insert/update.
 
-This is a semantic question — does "complete by April 20" mean:
-- **(A)** "Must be done by end-of-day April 20" → auto-close fires on April 21 (current behavior)
-- **(B)** "Must be done before April 20 starts" → auto-close fires on April 20 (what you expected)
+**`src/components/RequestDetail.tsx`**
+- Fetch the current request's platform row to know its `position_label` (single query in `useEffect`).
+- Reviewer "Add note" UI: when label ≠ `None`, render a small numeric `Input` (`inputMode="numeric"`, `maxLength={3}`, regex-stripped to digits, range 1–999) next to the textarea, with the label as a prefix (e.g. `Slide [ 12 ]`). Number is required to submit when label ≠ `None`.
+- On submit, insert `position_number` along with `content` (store the raw user note in `content`, the number in `position_number` — no string parsing).
+- When fetching notes, also select `position_number`. If platform label ≠ `None`, sort notes client-side by `position_number` (nulls last), then `created_at`, and render each note's header with a chip like `Slide 12` before the author/date row.
+- Legacy notes (null `position_number`) appear at the bottom of the ordered list.
 
-### Recommended fix: Option A semantics, but trigger same day after end-of-day
+**`src/components/RequestForm.tsx`** — no change. The number is captured per-note, not on the request itself.
 
-Change the query to close requests where `complete_by < today` OR (`complete_by = today` AND we're past end-of-day in the relevant timezone). The simplest clean implementation:
+### UX details
+- Numeric input rejects non-digits via `onChange` filter (`value.replace(/\D/g, "").slice(0, 3)`).
+- Empty / `0` is invalid; show an inline message and disable the Add Note button.
+- The label text shown to reviewers comes from the platform row, so changing a platform's label later affects only future notes' display ordering — stored numbers remain valid.
+- For platforms with label `None`, the form behaves exactly as today.
 
-**Use `complete_by <= today - 1 day` is current. Switch to `complete_by < today` already does that.**
+### Files Modified
+- `supabase/migrations/<new>.sql` (add columns + check constraint)
+- `src/components/settings/PlatformManagement.tsx`
+- `src/components/RequestDetail.tsx`
+- `supabase/functions/generate-review-report/index.ts`
 
-The cleanest interpretation of "complete by April 20" matching user expectation:
-> Close once the day has begun on April 21 UTC (i.e., the deadline day is fully over).
-
-**This is exactly what the current code does.** The test request is simply not overdue yet — it has until end-of-day April 20.
-
-### The actual fix you likely want
-
-Change semantic to **(B): close at the start of the deadline day** so "complete by April 20" means the auto-close fires the morning of April 20 if not done. Two-line change:
-
-```ts
-// before
-.lt("complete_by", today)
-// after
-.lte("complete_by", today)
-```
-
-This will close the test request on the very next hourly run.
-
-### Plan
-
-1. **Edit `supabase/functions/auto-close-overdue-requests/index.ts`**: change `.lt("complete_by", today)` to `.lte("complete_by", today)` so requests due *today* are closed (consistent with the UI showing "Overdue" on the deadline day itself).
-2. **Manually trigger the function once** after deploy via `curl_edge_functions` with the service-role token to verify the `Test Auto Close` request closes immediately, the report PDF generates, and the submitter gets the "all complete" email.
-3. **Verify in DB**: confirm `status='completed'`, `closed_reason='deadline_reached'`, `report_pdf_path` set, audit log row inserted, and `review_statuses` for incomplete reviewer remains `pending` (so the lock UI shows "Did not complete").
-
-### Files modified
-- `supabase/functions/auto-close-overdue-requests/index.ts` (one operator change)
-
-### Out of scope
-- The cron schedule, auth gate, report-generation chain, and email pipeline are all confirmed working — no changes needed there.
-
+### Out of Scope
+- Editing `position_number` after a note is created.
+- Backfilling existing notes with parsed numbers from their content.
+- Changing email templates (reminder / all-complete) — they don't list note bodies.

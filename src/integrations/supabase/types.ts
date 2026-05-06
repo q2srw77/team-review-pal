@@ -139,16 +139,19 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          position_label: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          position_label?: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          position_label?: string
         }
         Relationships: []
       }
@@ -185,6 +188,7 @@ export type Database = {
           content: string
           created_at: string
           id: string
+          position_number: number | null
           request_id: string
         }
         Insert: {
@@ -192,6 +196,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: string
+          position_number?: number | null
           request_id: string
         }
         Update: {
@@ -199,6 +204,7 @@ export type Database = {
           content?: string
           created_at?: string
           id?: string
+          position_number?: number | null
           request_id?: string
         }
         Relationships: [

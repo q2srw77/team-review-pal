@@ -30,11 +30,14 @@ import type { Database } from "@/integrations/supabase/types";
 type ReviewRequest = Database["public"]["Tables"]["review_requests"]["Row"];
 type RequestStatus = Database["public"]["Enums"]["request_status"];
 
+type PositionLabel = "None" | "Slide" | "Step" | "Page";
+
 interface Note {
   id: string;
   content: string;
   created_at: string;
   author_name: string;
+  position_number: number | null;
 }
 
 interface ReviewerStatus {
@@ -77,9 +80,11 @@ export default function RequestDetail({
   const { toast } = useToast();
   const [notes, setNotes] = useState<Note[]>([]);
   const [newNote, setNewNote] = useState("");
+  const [newNotePosition, setNewNotePosition] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitterName, setSubmitterName] = useState("");
   const [teamName, setTeamName] = useState("");
+  const [positionLabel, setPositionLabel] = useState<PositionLabel>("None");
   const [reviewerStatuses, setReviewerStatuses] = useState<ReviewerStatus[]>([]);
 
   // Edit mode state
@@ -99,8 +104,21 @@ export default function RequestDetail({
     fetchSubmitter();
     fetchTeam();
     fetchReviewerStatuses();
+    fetchPlatformLabel();
     setEditing(false);
+    setNewNote("");
+    setNewNotePosition("");
   }, [request, open]);
+
+  const fetchPlatformLabel = async () => {
+    if (!request?.platform) { setPositionLabel("None"); return; }
+    const { data } = await supabase
+      .from("platforms")
+      .select("position_label")
+      .eq("name", request.platform)
+      .maybeSingle();
+    setPositionLabel(((data as { position_label?: PositionLabel } | null)?.position_label ?? "None") as PositionLabel);
+  };
 
   const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
   const canArchiveDelete = user?.id === request?.submitted_by || isAdmin;
@@ -240,7 +258,7 @@ export default function RequestDetail({
     if (!request) return;
     const { data } = await supabase
       .from("request_notes")
-      .select("id, content, created_at, author_id")
+      .select("id, content, created_at, author_id, position_number")
       .eq("request_id", request.id)
       .order("created_at", { ascending: true });
 
@@ -255,28 +273,40 @@ export default function RequestDetail({
     const nameMap = new Map(profiles?.map((p) => [p.user_id, p.full_name]) ?? []);
 
     setNotes(
-      data.map((n) => ({
+      data.map((n: { id: string; content: string; created_at: string; author_id: string; position_number: number | null }) => ({
         id: n.id,
         content: n.content,
         created_at: n.created_at,
         author_name: nameMap.get(n.author_id) ?? "Unknown",
+        position_number: n.position_number,
       }))
     );
   };
 
   const addNote = async () => {
     if (!request || !user || !newNote.trim()) return;
+    let positionNumber: number | null = null;
+    if (positionLabel !== "None") {
+      const n = parseInt(newNotePosition, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 999) {
+        toast({ title: "Number required", description: `Enter a ${positionLabel.toLowerCase()} number (1–999).`, variant: "destructive" });
+        return;
+      }
+      positionNumber = n;
+    }
     setSubmitting(true);
     const { error } = await supabase.from("request_notes").insert({
       request_id: request.id,
       author_id: user.id,
       content: newNote.trim(),
+      position_number: positionNumber,
     });
     setSubmitting(false);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       setNewNote("");
+      setNewNotePosition("");
       fetchNotes();
     }
   };
@@ -615,11 +645,26 @@ export default function RequestDetail({
               <p className="text-sm text-muted-foreground italic">No reviewer notes yet.</p>
             )}
             <div className="space-y-3">
-              {notes.map((note) => (
+              {[...notes]
+                .sort((a, b) => {
+                  if (positionLabel === "None") return a.created_at.localeCompare(b.created_at);
+                  const ax = a.position_number ?? Number.MAX_SAFE_INTEGER;
+                  const bx = b.position_number ?? Number.MAX_SAFE_INTEGER;
+                  if (ax !== bx) return ax - bx;
+                  return a.created_at.localeCompare(b.created_at);
+                })
+                .map((note) => (
                 <div key={note.id} className="bg-secondary/40 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-sm text-foreground">{note.author_name}</span>
-                    <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {positionLabel !== "None" && note.position_number != null && (
+                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide shrink-0">
+                          {positionLabel} {note.position_number}
+                        </Badge>
+                      )}
+                      <span className="font-medium text-sm text-foreground truncate">{note.author_name}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
                   </div>
                   <p className="text-sm">{note.content}</p>
                 </div>
@@ -628,6 +673,19 @@ export default function RequestDetail({
 
             {isReviewer && request.status !== "completed" && (
               <div className="mt-4 space-y-2">
+                {positionLabel !== "None" && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{positionLabel} #</span>
+                    <Input
+                      value={newNotePosition}
+                      onChange={(e) => setNewNotePosition(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                      inputMode="numeric"
+                      maxLength={3}
+                      placeholder="1-999"
+                      className="h-8 w-24"
+                    />
+                  </div>
+                )}
                 <Textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
@@ -635,7 +693,11 @@ export default function RequestDetail({
                   rows={2}
                   maxLength={2000}
                 />
-                <Button size="sm" onClick={addNote} disabled={submitting || !newNote.trim()}>
+                <Button
+                  size="sm"
+                  onClick={addNote}
+                  disabled={submitting || !newNote.trim() || (positionLabel !== "None" && !newNotePosition)}
+                >
                   <Send className="w-3.5 h-3.5 mr-1.5" />
                   {submitting ? "Sending…" : "Add Note"}
                 </Button>
