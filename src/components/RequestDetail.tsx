@@ -104,8 +104,21 @@ export default function RequestDetail({
     fetchSubmitter();
     fetchTeam();
     fetchReviewerStatuses();
+    fetchPlatformLabel();
     setEditing(false);
+    setNewNote("");
+    setNewNotePosition("");
   }, [request, open]);
+
+  const fetchPlatformLabel = async () => {
+    if (!request?.platform) { setPositionLabel("None"); return; }
+    const { data } = await supabase
+      .from("platforms")
+      .select("position_label")
+      .eq("name", request.platform)
+      .maybeSingle();
+    setPositionLabel(((data as { position_label?: PositionLabel } | null)?.position_label ?? "None") as PositionLabel);
+  };
 
   const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
   const canArchiveDelete = user?.id === request?.submitted_by || isAdmin;
