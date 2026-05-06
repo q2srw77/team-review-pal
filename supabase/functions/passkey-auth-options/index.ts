@@ -16,42 +16,25 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
   try {
     const body = await req.json().catch(() => ({}))
-    const email = String(body?.email || '').trim().toLowerCase()
     const rpID = String(body?.rpID || '')
     if (!rpID) return json(400, { error: 'rpID required' })
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-    let allowCredentials: { id: string; transports?: AuthenticatorTransport[] }[] = []
-    if (email) {
-      const { data: profile } = await admin
-        .from('profiles')
-        .select('user_id')
-        .eq('email', email)
-        .maybeSingle()
-      if (profile) {
-        const { data: keys } = await admin
-          .from('user_passkeys')
-          .select('credential_id, transports')
-          .eq('user_id', profile.user_id)
-        allowCredentials = (keys ?? []).map((k) => ({
-          id: k.credential_id,
-          transports: (k.transports ?? []) as AuthenticatorTransport[],
-        }))
-      }
-    }
-
+    // Always use a discoverable-credential (resident key) flow. Never echo
+    // back which credentials a given email has — that leaks account existence
+    // and credential IDs to anonymous callers.
     const options = await generateAuthenticationOptions({
       rpID,
       userVerification: 'preferred',
-      allowCredentials,
+      allowCredentials: [],
     })
 
-    console.log('auth-options', { email, rpID, allowCount: allowCredentials.length })
+    console.log('auth-options', { rpID })
 
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString()
     await admin.from('passkey_challenges').insert({
-      email: email || null,
+      email: null,
       challenge: options.challenge,
       type: 'authentication',
       expires_at: expiresAt,
