@@ -851,6 +851,7 @@ export default function RequestDetail({
               </div>
             </>
           )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
