@@ -39,6 +39,10 @@ Deno.serve(async (req) => {
       .select('credential_id, transports')
       .eq('user_id', userId)
 
+    if ((existing?.length ?? 0) >= 3) {
+      return json(400, { error: 'Passkey limit reached (3). Remove one to add another.' })
+    }
+
     const options = await generateRegistrationOptions({
       rpName,
       rpID,

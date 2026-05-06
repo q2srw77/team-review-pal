@@ -71,6 +71,10 @@ Deno.serve(async (req) => {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
 
+    if ((existingCount ?? 0) >= 3) {
+      return json(400, { error: 'You already have the maximum of 3 passkeys. Remove one before adding another.' })
+    }
+
     const { data: inserted, error: insErr } = await admin
       .from('user_passkeys')
       .insert({
