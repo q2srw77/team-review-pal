@@ -645,11 +645,26 @@ export default function RequestDetail({
               <p className="text-sm text-muted-foreground italic">No reviewer notes yet.</p>
             )}
             <div className="space-y-3">
-              {notes.map((note) => (
+              {[...notes]
+                .sort((a, b) => {
+                  if (positionLabel === "None") return a.created_at.localeCompare(b.created_at);
+                  const ax = a.position_number ?? Number.MAX_SAFE_INTEGER;
+                  const bx = b.position_number ?? Number.MAX_SAFE_INTEGER;
+                  if (ax !== bx) return ax - bx;
+                  return a.created_at.localeCompare(b.created_at);
+                })
+                .map((note) => (
                 <div key={note.id} className="bg-secondary/40 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-sm text-foreground">{note.author_name}</span>
-                    <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
+                  <div className="flex items-center justify-between mb-1 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {positionLabel !== "None" && note.position_number != null && (
+                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide shrink-0">
+                          {positionLabel} {note.position_number}
+                        </Badge>
+                      )}
+                      <span className="font-medium text-sm text-foreground truncate">{note.author_name}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
                   </div>
                   <p className="text-sm">{note.content}</p>
                 </div>
@@ -658,6 +673,19 @@ export default function RequestDetail({
 
             {isReviewer && request.status !== "completed" && (
               <div className="mt-4 space-y-2">
+                {positionLabel !== "None" && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{positionLabel} #</span>
+                    <Input
+                      value={newNotePosition}
+                      onChange={(e) => setNewNotePosition(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                      inputMode="numeric"
+                      maxLength={3}
+                      placeholder="1-999"
+                      className="h-8 w-24"
+                    />
+                  </div>
+                )}
                 <Textarea
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
@@ -665,7 +693,11 @@ export default function RequestDetail({
                   rows={2}
                   maxLength={2000}
                 />
-                <Button size="sm" onClick={addNote} disabled={submitting || !newNote.trim()}>
+                <Button
+                  size="sm"
+                  onClick={addNote}
+                  disabled={submitting || !newNote.trim() || (positionLabel !== "None" && !newNotePosition)}
+                >
                   <Send className="w-3.5 h-3.5 mr-1.5" />
                   {submitting ? "Sending…" : "Add Note"}
                 </Button>
