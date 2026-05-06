@@ -24,13 +24,15 @@ Deno.serve(async (req) => {
       })
     }
     const token = authHeader.replace('Bearer ', '')
-    let isServiceRole = false
-    try {
-      const payloadB64 = token.split('.')[1]
-      const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
-      const payload = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')))
-      isServiceRole = payload?.role === 'service_role'
-    } catch { /* fall through */ }
+    let isServiceRole = token === serviceRoleKey
+    if (!isServiceRole) {
+      try {
+        const payloadB64 = token.split('.')[1]
+        const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4)
+        const payload = JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')))
+        isServiceRole = payload?.role === 'service_role'
+      } catch { /* fall through */ }
+    }
 
     if (!isServiceRole) {
       const anonClient = createClient(supabaseUrl, anonKey, {
