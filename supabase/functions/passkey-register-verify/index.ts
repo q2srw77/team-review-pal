@@ -65,22 +65,52 @@ Deno.serve(async (req) => {
     const { credential } = verification.registrationInfo
     const transports = (response?.response?.transports ?? []) as string[]
 
-    const { error: insErr } = await admin.from('user_passkeys').insert({
-      user_id: userId,
-      credential_id: credential.id,
-      public_key: btoa(String.fromCharCode(...credential.publicKey)),
-      counter: credential.counter ?? 0,
-      transports,
-      device_label: deviceLabel,
-    })
-    if (insErr) {
+    // Count existing passkeys BEFORE inserting to know if this is the first
+    const { count: existingCount } = await admin
+      .from('user_passkeys')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+
+    const { data: inserted, error: insErr } = await admin
+      .from('user_passkeys')
+      .insert({
+        user_id: userId,
+        credential_id: credential.id,
+        public_key: btoa(String.fromCharCode(...credential.publicKey)),
+        counter: credential.counter ?? 0,
+        transports,
+        device_label: deviceLabel,
+      })
+      .select('id')
+      .single()
+    if (insErr || !inserted) {
       console.error('insert passkey failed', insErr)
       return json(500, { error: 'Could not save passkey' })
     }
 
+    // First passkey → rotate Supabase password to a random value so password
+    // sign-in is enforced at the auth layer, not just the UI.
+    if ((existingCount ?? 0) === 0) {
+      const randomBytes = crypto.getRandomValues(new Uint8Array(48))
+      const randomPassword = btoa(String.fromCharCode(...randomBytes)) + 'Aa1!'
+      const { error: pwErr } = await admin.auth.admin.updateUserById(userId, {
+        password: randomPassword,
+      })
+      if (pwErr) {
+        // Roll back the inserted passkey so the user isn't locked out
+        // with a passkey-only state we couldn't actually enforce.
+        console.error('password rotation failed, rolling back passkey', pwErr)
+        await admin.from('user_passkeys').delete().eq('id', inserted.id)
+        return json(500, { error: 'Could not enforce passkey-only sign-in. Please try again.' })
+      }
+      console.log('passkey-register-verify: first passkey, rotated password', { userId })
+    } else {
+      console.log('passkey-register-verify: additional passkey, skipping rotation', { userId })
+    }
+
     await admin.from('passkey_challenges').update({ used_at: new Date().toISOString() }).eq('id', ch.id)
 
-    // Disable password sign-in for this account
+    // Disable password sign-in for this account (UI hint)
     await admin.from('profiles').update({ password_disabled: true }).eq('user_id', userId)
 
     return json(200, { ok: true })
