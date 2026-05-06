@@ -157,6 +157,21 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
   const filtersActive = search.trim() !== "" || platformFilter !== "all" || (view === "active" && statusFilter !== "all");
   const clearFilters = () => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); };
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<25 | 50 | 100>(25);
+
+  // Reset to first page when filters, tab, or page size change
+  useEffect(() => { setPage(1); }, [search, platformFilter, statusFilter, view, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(requests.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIdx = requests.length === 0 ? 0 : (currentPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, requests.length);
+  const pagedRequests = useMemo(
+    () => requests.slice(startIdx, endIdx),
+    [requests, startIdx, endIdx]
+  );
+
 
   return (
     <div className="min-h-screen bg-background">
