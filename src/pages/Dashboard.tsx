@@ -157,6 +157,21 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
   const filtersActive = search.trim() !== "" || platformFilter !== "all" || (view === "active" && statusFilter !== "all");
   const clearFilters = () => { setSearch(""); setPlatformFilter("all"); setStatusFilter("all"); };
 
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<25 | 50 | 100>(25);
+
+  // Reset to first page when filters, tab, or page size change
+  useEffect(() => { setPage(1); }, [search, platformFilter, statusFilter, view, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(requests.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIdx = requests.length === 0 ? 0 : (currentPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, requests.length);
+  const pagedRequests = useMemo(
+    () => requests.slice(startIdx, endIdx),
+    [requests, startIdx, endIdx]
+  );
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -306,7 +321,7 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
                   </tr>
                 </thead>
                 <tbody>
-                  {requests.map((r) => (
+                  {pagedRequests.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => openDetail(r)}
@@ -388,6 +403,47 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-border px-4 py-3 text-sm">
+              <div className="text-muted-foreground">
+                Showing {startIdx + 1}–{endIdx} of {requests.length}
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Rows per page</span>
+                  <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v) as 25 | 50 | 100)}>
+                    <SelectTrigger className="w-20 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-muted-foreground whitespace-nowrap">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
