@@ -5,9 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ClipboardCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+type Action = "password" | "remove-passkeys";
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -15,6 +18,7 @@ export default function ResetPassword() {
   const { toast } = useToast();
   const token = params.get("token") ?? "";
 
+  const [action, setAction] = useState<Action>("password");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -22,7 +26,7 @@ export default function ResetPassword() {
 
   useEffect(() => {
     if (!token) {
-      toast({ title: "Invalid reset link", description: "This link is missing a token.", variant: "destructive" });
+      toast({ title: "Invalid recovery link", description: "This link is missing a token.", variant: "destructive" });
     }
   }, [token, toast]);
 
@@ -51,11 +55,11 @@ export default function ResetPassword() {
 
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("confirm-password-reset", {
+      const fnName = action === "password" ? "confirm-password-reset" : "account-recovery-passkeys";
+      const { data, error } = await supabase.functions.invoke(fnName, {
         body: { token, code, newPassword: password },
       });
 
-      // Extract server-provided error message from either shape
       let serverError: string | null = null;
       if (error) {
         try {
@@ -65,11 +69,11 @@ export default function ResetPassword() {
             serverError = parsed?.error ?? null;
           }
         } catch {
-          // ignore parse errors
+          // ignore
         }
-        if (!serverError) serverError = (error as any)?.message || "Reset failed";
+        if (!serverError) serverError = (error as any)?.message || "Recovery failed";
       } else if (data && (data as any).ok === false) {
-        serverError = (data as any).error || "Reset failed";
+        serverError = (data as any).error || "Recovery failed";
       }
 
       if (serverError) {
@@ -77,10 +81,17 @@ export default function ResetPassword() {
         return;
       }
 
-      toast({ title: "Password updated", description: "You can now sign in with your new password." });
+      if (action === "password") {
+        toast({ title: "Password updated", description: "You can now sign in with your new password." });
+      } else {
+        toast({
+          title: "Account recovered",
+          description: "Your passkeys were removed and password sign-in is enabled. You can set up a new passkey from your profile.",
+        });
+      }
       navigate("/", { replace: true });
     } catch (err: any) {
-      toast({ title: "Reset failed", description: err.message, variant: "destructive" });
+      toast({ title: "Recovery failed", description: err.message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -93,11 +104,44 @@ export default function ResetPassword() {
           <div className="mx-auto w-12 h-12 bg-primary rounded-xl flex items-center justify-center mb-2">
             <ClipboardCheck className="w-6 h-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight">Reset password</CardTitle>
-          <CardDescription>Enter the verification code from your email and choose a new password.</CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight">Account Recovery</CardTitle>
+          <CardDescription>
+            Enter the verification code from your email and choose how to recover your account.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Recovery action</Label>
+              <RadioGroup value={action} onValueChange={(v) => setAction(v as Action)} className="gap-2">
+                <label
+                  htmlFor="action-password"
+                  className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40"
+                >
+                  <RadioGroupItem id="action-password" value="password" className="mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium">Reset my password</div>
+                    <div className="text-xs text-muted-foreground">
+                      Set a new password and keep your existing passkeys.
+                    </div>
+                  </div>
+                </label>
+                <label
+                  htmlFor="action-passkeys"
+                  className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40"
+                >
+                  <RadioGroupItem id="action-passkeys" value="remove-passkeys" className="mt-0.5" />
+                  <div className="space-y-0.5">
+                    <div className="text-sm font-medium">Remove my passkeys & re-enable password</div>
+                    <div className="text-xs text-muted-foreground">
+                      Lost your passkey? This deletes all passkeys, sets a new password, and re-enables
+                      password sign-in. You can enroll a new passkey afterwards.
+                    </div>
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+
             <div className="space-y-2">
               <Label>Verification code</Label>
               <div className="flex justify-center">
@@ -138,7 +182,11 @@ export default function ResetPassword() {
               Must include upper & lower case letters and a number.
             </p>
             <Button type="submit" className="w-full" disabled={submitting || !token}>
-              {submitting ? "Updating…" : "Update password"}
+              {submitting
+                ? "Working…"
+                : action === "password"
+                ? "Update password"
+                : "Recover account"}
             </Button>
             <Button type="button" variant="ghost" className="w-full" onClick={() => navigate("/")}>
               Back to sign in
