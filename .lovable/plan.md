@@ -1,35 +1,18 @@
-# Search & Filter Controls for Review Requests
+# Inline filter controls with the Active/Completed tabs
 
-Add a controls row to the Dashboard so users can quickly narrow down the requests table.
+Move the search box, platform dropdown, and status dropdown onto the same row as the Active/Completed segmented buttons, aligned to the right.
 
 ## What changes
 
-A new toolbar appears above the requests table (between the Active/Completed tabs and the table itself) with three controls:
-
-1. **Search by title** — text input with a search icon. Filters the current view (Active or Completed) to rows whose title contains the typed text (case-insensitive). Includes a clear (×) button when text is present.
-2. **Platform filter** — dropdown listing "All platforms" plus every platform currently present in the loaded requests (built from the data so it stays accurate even if a platform is later removed from the catalog).
-3. **Status filter** — dropdown with options:
-   - In the Active tab: "All active", "Pending", "In Review"
-   - In the Completed tab: hidden (status is already implied) — keeps the bar clean.
-
-A small helper line on the right shows "Showing X of Y" so users see how much was filtered. A "Clear filters" link appears only when at least one filter is active.
-
-## Behavior details
-
-- All filtering is **client-side** on the existing `allRequests` state — no extra Supabase queries.
-- Filters apply on top of the existing Active/Completed split and the existing role-based visibility rules.
-- Switching between Active and Completed tabs preserves the search text and platform filter; the status filter resets because its options change.
-- Layout: stacks vertically on mobile (`flex-col`), single row on `sm+` (`sm:flex-row`), with the search input growing (`flex-1`) and the two selects at fixed widths.
-- Empty result state: when filters return zero rows (but unfiltered would have rows), show a small inline message "No requests match your filters" with a "Clear filters" button instead of the existing "No review requests yet" empty card.
+- Wrap the Active/Completed segmented control and the filter controls in a single flex row with `justify-between`.
+  - Left: existing Active/Completed segmented control.
+  - Right: search input + platform select + status select (Active tab only) + Clear button.
+- Shrink the search input from `flex-1` to a fixed compact width (~`w-56`, `lg:w-64`) so it doesn't push the dropdowns around.
+- Tighten the dropdown widths (`w-40` / `w-36`) for a more balanced look on the same line.
+- On mobile (`<sm`), the row stacks: tabs on top, then a wrapped filter group underneath, so nothing gets squished.
 
 ## Files to modify
 
-- `src/pages/Dashboard.tsx` — add filter state (`search`, `platformFilter`, `statusFilter`), derive `filteredRequests` via `useMemo`, render the toolbar, and feed the filtered list into the table + count.
+- `src/pages/Dashboard.tsx` — restructure the toolbar markup; remove the standalone filter row and merge it into the tabs row.
 
-No backend, schema, or RLS changes. No new dependencies — uses existing `Input`, `Select`, and `lucide-react` icons (`Search`, `X`).
-
-## Out of scope
-
-- Saving filter state across sessions.
-- Filtering by team, submitter, or date range (can be added later if needed).
-- Server-side filtering / pagination.
+No state/logic changes — same filter behavior, just relocated and resized.
