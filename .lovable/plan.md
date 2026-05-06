@@ -1,39 +1,45 @@
-## Diagnosis
+## Root cause
 
-The edge-function logs and database state tell a clear story:
+The registration just crashed with this error in the edge function logs:
 
-**From the logs** (`reviewhub.cyphersecurity.us`, `steve.weber@sophos.com`):
-- `auth-options` returned `allowCount: 0` — the server found **zero** registered passkeys for this email.
-- The browser still showed Touch ID anyway and sent a credential with id `voCK-CkDX...`.
-- `auth-verify` looked that credential up and got `found: false` → returns **"Unknown passkey"** (400).
+```
+passkey-register-verify TypeError: Cannot read properties of undefined (reading 'id')
+    at index.ts:94:33
+```
 
-**From the database**:
-- `user_passkeys` is **completely empty** (0 rows total).
-- The profile `steve.weber@sophos.com` exists but has 0 passkeys linked.
-- There are 3 stored authentication challenges and only 1 registration challenge — meaning a registration was attempted but never completed end-to-end (no row landed in `user_passkeys`).
+Line 94 is:
+```ts
+const { credential } = verification.registrationInfo
+```
+followed by `credential.id`, `credential.publicKey`, `credential.counter`.
 
-So the failure is **not** an RP ID mismatch or a verify-step bug. The passkey simply does not exist server-side. The browser/OS keychain is happy to present a credential it has cached locally (from a previous registration attempt — possibly on the `lovableproject.com` preview domain, which has a different RP ID and therefore wouldn't match anyway), but our DB has nothing to match it to.
+That `credential: {...}` shape is the **SimpleWebAuthn v11** return shape. But all four edge functions import from `npm:@simplewebauthn/server@10`, which returns the **flat v10 shape**:
+```
+registrationInfo.credentialID
+registrationInfo.credentialPublicKey
+registrationInfo.counter
+```
+So `verification.registrationInfo.credential` is `undefined` → `.id` throws → 500 → "non-2xx error" in the UI. The webauthn ceremony itself succeeded (`verified: true, hasInfo: true` in the logs); we just can't read the result.
 
-### Why the registration probably didn't persist
+`passkey-auth-verify` has the same mismatch — it passes a v11-style `credential: { id, publicKey, counter }` to `verifyAuthenticationResponse`, which v10 doesn't accept (it expects `authenticator: { credentialID, credentialPublicKey, counter }`). That's the next failure that would surface once a passkey actually gets stored.
 
-Looking at `passkey-register-verify`, the row is inserted only after `verifyRegistrationResponse` succeeds AND the password rotation succeeds. If either step failed, the registration silently doesn't save. We have no register-verify logs to confirm which (the edge function shut down before the latest attempt), so we can't tell from logs alone — but the empty `user_passkeys` table is the smoking gun.
+## Fix
 
-## What to do
+Upgrade the server import from `@simplewebauthn/server@10` to `@simplewebauthn/server@11` in all four passkey edge functions. The code already matches v11's API, so no other logic changes are needed.
 
-No code change is needed yet — the bug is operational, not in the verify path. Two-step recovery:
+Also bump `@simplewebauthn/browser` in `package.json` from `"10"` to `"^11"` so client and server stay on the same major (the v10 browser bundle works against a v11 server in practice, but staying matched avoids future drift).
 
-1. **Remove the stale OS-level credential** for `reviewhub.cyphersecurity.us` (and `team-review-pal.lovable.app` / `lovableproject.com` if any) from the device's password/passkey manager (macOS: System Settings → Passwords; Chrome: chrome://settings/passkeys). Otherwise the browser will keep offering the orphaned credential and verify will keep failing with "Unknown passkey".
-2. **Re-register the passkey** while signed in on `reviewhub.cyphersecurity.us` (Profile → Passkey → Set up Passkey). After the prompt completes, we should see a new row in `user_passkeys` and `auth-options` should return `allowCount: 1`.
+### Files to change
 
-## If re-registration also fails
+- `supabase/functions/passkey-register-options/index.ts` — change import to `@simplewebauthn/server@11`
+- `supabase/functions/passkey-register-verify/index.ts` — same
+- `supabase/functions/passkey-auth-options/index.ts` — same
+- `supabase/functions/passkey-auth-verify/index.ts` — same
+- `package.json` — bump `@simplewebauthn/browser` to `^11`
 
-That would mean `passkey-register-verify` is rejecting or the password-rotation rollback is firing. To pinpoint it next round I'd:
+## After deploy
 
-- Add explicit checkpoint logs to `passkey-register-verify` (challenge lookup result, `verification.verified`, insert error, password-rotation error) — same pattern we just added to the auth functions.
-- Have you retry registration so we capture a full trace.
+1. Remove any stale passkey for `reviewhub.cyphersecurity.us` from the OS/browser keychain (the previous half-registered ones never landed in our DB).
+2. Sign in with password, go to Profile → Set up Passkey. The row should now persist in `user_passkeys`, and signing out and back in via passkey should succeed.
 
-## Files involved (no edits in this plan)
-
-- `supabase/functions/passkey-register-verify/index.ts` — only place that writes to `user_passkeys`
-- `supabase/functions/passkey-auth-options/index.ts` — confirmed returning `allowCount: 0`
-- `supabase/functions/passkey-auth-verify/index.ts` — confirmed rejecting at credential lookup
+If anything still fails, the existing checkpoint logs in all four functions will pinpoint the step.

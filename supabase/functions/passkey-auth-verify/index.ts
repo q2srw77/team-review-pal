@@ -1,5 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { verifyAuthenticationResponse } from 'npm:@simplewebauthn/server@10'
+import { verifyAuthenticationResponse } from 'npm:@simplewebauthn/server@11'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
