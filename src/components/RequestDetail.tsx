@@ -83,6 +83,10 @@ export default function RequestDetail({
   const [newNote, setNewNote] = useState("");
   const [newNotePosition, setNewNotePosition] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteContent, setEditNoteContent] = useState("");
+  const [editNotePosition, setEditNotePosition] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   const [submitterName, setSubmitterName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [positionLabel, setPositionLabel] = useState<PositionLabel>("None");
