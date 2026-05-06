@@ -337,71 +337,199 @@ export default function TeamManagement() {
 
       {/* Manage Members Dialog */}
       <Dialog open={!!membersTarget} onOpenChange={(o) => { if (!o) setMembersTarget(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Members — {membersTarget?.name}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+            <DialogTitle className="text-lg">Members — {membersTarget?.name}</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {members.length} assigned · {availableProfiles.length} available
+            </p>
+          </DialogHeader>
 
           {membersLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="text-sm text-muted-foreground p-6">Loading…</p>
           ) : (
-            <>
-              {/* Add member */}
-              {availableProfiles.length > 0 ? (
-                <>
-                  <Input
-                    placeholder="Search users..."
-                    value={memberSearch}
-                    onChange={(e) => setMemberSearch(e.target.value)}
-                    className="mb-2"
-                  />
-                  <div className="border rounded-md max-h-40 overflow-y-auto p-2 space-y-1">
-                    {filteredProfiles.length === 0 ? (
-                      <p className="text-sm text-muted-foreground p-1.5">No matching users.</p>
-                    ) : (
-                      filteredProfiles.map((p) => (
-                        <label key={p.user_id} className="flex items-center gap-2 p-1.5 rounded hover:bg-accent cursor-pointer text-sm">
-                          <Checkbox
-                            checked={selectedUserIds.includes(p.user_id)}
-                            onCheckedChange={(checked) => {
-                              setSelectedUserIds(prev =>
-                                checked ? [...prev, p.user_id] : prev.filter(id => id !== p.user_id)
-                              );
-                            }}
-                          />
-                          <span>{p.full_name || p.email}</span>
-                        </label>
-                      ))
+            <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+              {/* Available pane */}
+              <div className="flex flex-col h-[60vh]">
+                <div className="px-5 py-3 border-b bg-muted/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <UserPlus className="w-4 h-4 text-muted-foreground" />
+                      Available
+                      <Badge variant="secondary" className="ml-1">{availableProfiles.length}</Badge>
+                    </h3>
+                    {filteredAvailable.length > 0 && (
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <Checkbox
+                          checked={allFilteredAvailableSelected}
+                          onCheckedChange={(checked) => {
+                            setSelectedAvailable(checked ? filteredAvailable.map(p => p.user_id) : []);
+                          }}
+                        />
+                        Select all
+                      </label>
                     )}
                   </div>
-                  <Button onClick={addMember} disabled={selectedUserIds.length === 0} size="sm">
-                    Add ({selectedUserIds.length})
-                  </Button>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">All users are already members.</p>
-              )}
-
-              {/* Current members */}
-              {members.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No members yet.</p>
-              ) : (
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {members.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between p-2 rounded-md border">
-                      <div className="text-sm">
-                        <p className="font-medium">{m.profile?.full_name || "Unknown"}</p>
-                        <p className="text-muted-foreground text-xs">{m.profile?.email}</p>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={() => removeMember(m.id)}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  ))}
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search users…"
+                      value={availableSearch}
+                      onChange={(e) => setAvailableSearch(e.target.value)}
+                      className="pl-8 h-9"
+                    />
+                  </div>
                 </div>
-              )}
-            </>
+                <ScrollArea className="flex-1">
+                  <div className="p-2">
+                    {filteredAvailable.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-4 text-center">
+                        {availableProfiles.length === 0 ? "All users are already members." : "No matching users."}
+                      </p>
+                    ) : (
+                      filteredAvailable.map((p) => {
+                        const checked = selectedAvailable.includes(p.user_id);
+                        return (
+                          <div
+                            key={p.user_id}
+                            className={`group flex items-center gap-3 px-2 py-2 rounded-md cursor-pointer transition-colors ${checked ? "bg-accent" : "hover:bg-accent/50"}`}
+                            onClick={() => setSelectedAvailable(prev =>
+                              prev.includes(p.user_id) ? prev.filter(id => id !== p.user_id) : [...prev, p.user_id]
+                            )}
+                          >
+                            <Checkbox checked={checked} className="pointer-events-none" />
+                            <Avatar className="w-8 h-8">
+                              <AvatarFallback className="text-xs">{initials(p.full_name, p.email)}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{p.full_name || p.email}</p>
+                              {p.full_name && <p className="text-xs text-muted-foreground truncate">{p.email}</p>}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => { e.stopPropagation(); addMembers([p.user_id]); }}
+                              title="Add to team"
+                            >
+                              <ArrowRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+                <div className="border-t p-3 bg-muted/20">
+                  <Button
+                    onClick={() => addMembers(selectedAvailable)}
+                    disabled={selectedAvailable.length === 0}
+                    size="sm"
+                    className="w-full"
+                  >
+                    <ArrowRight className="w-4 h-4 mr-2" />
+                    Add selected ({selectedAvailable.length})
+                  </Button>
+                </div>
+              </div>
+
+              {/* Assigned pane */}
+              <div className="flex flex-col h-[60vh]">
+                <div className="px-5 py-3 border-b bg-muted/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <UserMinus className="w-4 h-4 text-muted-foreground" />
+                      Assigned
+                      <Badge variant="secondary" className="ml-1">{members.length}</Badge>
+                    </h3>
+                    {filteredAssigned.length > 0 && (
+                      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                        <Checkbox
+                          checked={allFilteredAssignedSelected}
+                          onCheckedChange={(checked) => {
+                            setSelectedAssigned(checked ? filteredAssigned.map(m => m.user_id) : []);
+                          }}
+                        />
+                        Select all
+                      </label>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search members…"
+                      value={assignedSearch}
+                      onChange={(e) => setAssignedSearch(e.target.value)}
+                      className="pl-8 h-9"
+                    />
+                  </div>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-2">
+                    {filteredAssigned.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-4 text-center">
+                        {members.length === 0 ? "No members yet — add some from the left." : "No matching members."}
+                      </p>
+                    ) : (
+                      filteredAssigned.map((m) => {
+                        const checked = selectedAssigned.includes(m.user_id);
+                        return (
+                          <div
+                            key={m.id}
+                            className={`group flex items-center gap-3 px-2 py-2 rounded-md cursor-pointer transition-colors ${checked ? "bg-accent" : "hover:bg-accent/50"}`}
+                            onClick={() => setSelectedAssigned(prev =>
+                              prev.includes(m.user_id) ? prev.filter(id => id !== m.user_id) : [...prev, m.user_id]
+                            )}
+                          >
+                            <Checkbox checked={checked} className="pointer-events-none" />
+                            <Avatar className="w-8 h-8">
+                              <AvatarFallback className="text-xs">
+                                {initials(m.profile?.full_name, m.profile?.email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{m.profile?.full_name || m.profile?.email || "Unknown"}</p>
+                              {m.profile?.full_name && (
+                                <p className="text-xs text-muted-foreground truncate">{m.profile?.email}</p>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                              onClick={(e) => { e.stopPropagation(); removeMembersByUserIds([m.user_id]); }}
+                              title="Remove from team"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+                <div className="border-t p-3 bg-muted/20">
+                  <Button
+                    onClick={() => removeMembersByUserIds(selectedAssigned)}
+                    disabled={selectedAssigned.length === 0}
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remove selected ({selectedAssigned.length})
+                  </Button>
+                </div>
+              </div>
+            </div>
           )}
+
+          <DialogFooter className="px-6 py-4 border-t bg-muted/10">
+            <Button variant="outline" onClick={() => setMembersTarget(null)}>Done</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }
