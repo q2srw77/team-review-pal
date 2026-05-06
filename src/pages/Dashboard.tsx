@@ -131,19 +131,21 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
+      <header className="sticky top-0 z-30 bg-card/80 backdrop-blur border-b border-border shadow-sm">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shrink-0">
               <ClipboardCheck className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight text-foreground"><h1 className="text-lg font-bold tracking-tight text-foreground">Review Hub</h1></h1>
-            {(roles.includes("admin") ? ["admin"] : roles).map(role => (
-              <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">{role}</Badge>
-            ))}
+            <h1 className="text-lg font-bold tracking-tight text-foreground truncate">Review Hub</h1>
+            <div className="hidden sm:flex items-center gap-1.5">
+              {(roles.includes("admin") ? ["admin"] : roles).map(role => (
+                <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">{role}</Badge>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:inline">{profileName}</span>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <span className="text-sm text-muted-foreground hidden md:inline">{profileName}</span>
             {onNavigateProfile && (
               <Button variant="ghost" size="icon" onClick={onNavigateProfile} title="Profile">
                 <User className="w-4 h-4" />
