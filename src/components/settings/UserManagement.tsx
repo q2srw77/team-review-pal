@@ -84,6 +84,16 @@ export default function UserManagement() {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
+  const extractError = async (data: any, error: any): Promise<string | null> => {
+    if (data?.error) return data.error;
+    if (!error) return null;
+    try {
+      const ctx = await (error as any).context?.json?.();
+      if (ctx?.error) return ctx.error;
+    } catch { /* ignore */ }
+    return error.message ?? null;
+  };
+
   const toggleRole = (current: AppRole[], role: AppRole): AppRole[] =>
     current.includes(role) ? current.filter((r) => r !== role) : [...current, role];
 
@@ -98,7 +108,8 @@ export default function UserManagement() {
     const { data, error } = await supabase.functions.invoke("invite-user", { body: inviteForm });
     setInviting(false);
     if (error || data?.error) {
-      toast({ title: data?.error || error?.message || "Failed to invite user", variant: "destructive" }); return;
+      const msg = await extractError(data, error);
+      toast({ title: msg || "Failed to invite user", variant: "destructive" }); return;
     }
     toast({ title: "User invited successfully" });
     setInviteOpen(false);
@@ -114,7 +125,8 @@ export default function UserManagement() {
       body: { action: "update_roles", user_id: roleChangeTarget.user_id, roles: newRoles },
     });
     if (error || data?.error) {
-      toast({ title: data?.error || error?.message || "Failed to update roles", variant: "destructive" });
+      const msg = await extractError(data, error);
+      toast({ title: msg || "Failed to update roles", variant: "destructive" });
     } else {
       toast({ title: "Roles updated" }); fetchUsers();
     }
@@ -137,7 +149,8 @@ export default function UserManagement() {
     const { data, error } = await supabase.functions.invoke("manage-user", { body });
     setSaving(false);
     if (error || data?.error) {
-      toast({ title: data?.error || error?.message || "Failed to update user", variant: "destructive" });
+      const msg = await extractError(data, error);
+      toast({ title: msg || "Failed to update user", variant: "destructive" });
     } else {
       toast({ title: "User updated" }); setEditTarget(null); fetchUsers();
     }
@@ -149,7 +162,8 @@ export default function UserManagement() {
       body: { action: "delete_user", user_id: deleteTarget.user_id },
     });
     if (error || data?.error) {
-      toast({ title: data?.error || error?.message || "Failed to remove user", variant: "destructive" });
+      const msg = await extractError(data, error);
+      toast({ title: msg || "Failed to remove user", variant: "destructive" });
     } else {
       toast({ title: "User removed" }); fetchUsers();
     }

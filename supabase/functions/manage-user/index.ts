@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
         const { error: authError } = await supabase.auth.admin.updateUserById(user_id, authUpdate);
         if (authError) {
           return new Response(JSON.stringify({ error: authError.message }), {
-            status: 500,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
           .eq("user_id", user_id);
         if (profileError) {
           return new Response(JSON.stringify({ error: profileError.message }), {
-            status: 500,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
       const { error } = await supabase.auth.admin.deleteUser(user_id);
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
-          status: 500,
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
