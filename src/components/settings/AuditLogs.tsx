@@ -16,7 +16,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronLeft, ChevronRight, Eye, ChevronDown } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight, Eye, ChevronDown, Search, X } from "lucide-react";
 import { format } from "date-fns";
 
 interface AuditLog {
