@@ -16,7 +16,7 @@ export async function registerPasskey(deviceLabel: string) {
     "passkey-register-options",
     { body: { rpID, rpName: "Review Hub" } }
   );
-  if (optsErr) throw new Error(optsErr.message);
+  if (optsErr) throw new Error(optsData?.error || optsErr.message);
   if (!optsData?.options) throw new Error("Failed to get registration options");
 
   const attResp = await startRegistration(optsData.options);
@@ -25,7 +25,7 @@ export async function registerPasskey(deviceLabel: string) {
     "passkey-register-verify",
     { body: { response: attResp, rpID, origin, deviceLabel } }
   );
-  if (verifyErr) throw new Error(verifyErr.message);
+  if (verifyErr) throw new Error(verifyData?.error || verifyErr.message);
   if (!verifyData?.ok) throw new Error(verifyData?.error || "Verification failed");
 }
 

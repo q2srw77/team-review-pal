@@ -1,32 +1,32 @@
-# Limit Users to 3 Passkeys
+# Diagnose passkey sign-in failure
 
-Multiple passkeys per user already work. This change enforces a hard cap of 3 — both server-side (authoritative) and client-side (UX).
+You authenticated with the passkey (the OS prompt succeeded), so the failure is happening server-side in `passkey-auth-verify` (or in the magic-link mint step). Today the client throws a generic "non-2xx" error and the server only logs at the `catch` boundary, so we can't see which guard rejected the request.
 
-## Changes
+## Plan
 
-### `supabase/functions/passkey-register-verify/index.ts`
-After looking up `existingCount` (already present), if it's `>= 3` return:
-`json(400, { error: 'You already have the maximum of 3 passkeys. Remove one before adding another.' })`
-Do this **before** running WebAuthn verification and inserting — no wasted work, no orphan challenge cleanup needed beyond what already happens.
+### 1. Surface the real server error in the client
+In `src/lib/passkeys.ts`, `signInWithPasskey()` currently throws `optsErr.message` / `verifyErr.message`, which for `supabase.functions.invoke` is just `"Edge Function returned a non-2xx status code"`. Update both invoke calls to also read `data?.error` (the JSON body is delivered even on non-2xx) and prefer that message in the thrown `Error`. Same fix for `registerPasskey` for symmetry.
 
-### `supabase/functions/passkey-register-options/index.ts`
-Mirror the check at options-generation time so the browser never even prompts:
-- Count `user_passkeys` for this user; if `>= 3`, return `400 { error: 'Passkey limit reached (3). Remove one to add another.' }`.
+### 2. Add checkpoint logs to `passkey-auth-verify`
+Insert `console.log` statements at each decision point so the next failure tells us exactly which branch fired:
+- after parsing body: log `{ rpID, origin, hasResponse, credentialId }`
+- after challenge lookup: log `{ found, expired, used }`
+- after credential lookup: log `{ found, userId }`
+- after `verifyAuthenticationResponse`: log `{ verified, newCounter }`
+- before `generateLink`: log `{ email }`; on error log full `linkErr`
 
-### `src/components/profile/PasskeySettings.tsx`
-- When `keys.length >= 3`: hide the device-name input + setup button, replace with a small muted note: *"You've reached the maximum of 3 passkeys. Remove one to add another."*
-- Update the button label logic: still "Set up Passkey" when 0, "Add another passkey" when 1–2, hidden at 3.
+### 3. Add checkpoint logs to `passkey-auth-options`
+- log `{ email, rpID, allowCount }` so we can confirm the credential list isn't empty
 
-## Validation
+### 4. Re-test and read logs
+After deploy, retry sign-in on `reviewhub.cyphersecurity.us`. The next message will include edge-function logs that pinpoint the failing branch (most likely candidates: `Unknown passkey` due to a credential_id encoding mismatch, `Verification failed` due to RP ID mismatch on the custom domain, or `generateLink` failing).
 
-1. Register passkeys 1, 2, 3 from Profile — all succeed.
-2. UI hides the add button after the 3rd; helper text appears.
-3. Manually invoke `passkey-register-options` with a 4th attempt (curl with valid JWT) → returns 400 with the limit message.
-4. Remove one passkey → add button reappears, can register again.
+### 5. Fix based on findings
+Ship the targeted fix in a follow-up turn once the logs identify the branch. No speculative changes now.
 
-## Files
+## Files touched
+- `src/lib/passkeys.ts` — better error extraction
+- `supabase/functions/passkey-auth-verify/index.ts` — checkpoint logs
+- `supabase/functions/passkey-auth-options/index.ts` — checkpoint logs
 
-**Edited**
-- `supabase/functions/passkey-register-options/index.ts`
-- `supabase/functions/passkey-register-verify/index.ts`
-- `src/components/profile/PasskeySettings.tsx`
+No DB or schema changes.
