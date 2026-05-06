@@ -36,6 +36,7 @@ interface Note {
   id: string;
   content: string;
   created_at: string;
+  author_id: string;
   author_name: string;
   position_number: number | null;
 }
