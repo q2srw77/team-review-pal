@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -18,9 +19,13 @@ import { MoreHorizontal, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
+type PositionLabel = "None" | "Slide" | "Step" | "Page";
+const POSITION_LABELS: PositionLabel[] = ["None", "Slide", "Step", "Page"];
+
 interface Platform {
   id: string;
   name: string;
+  position_label: PositionLabel;
   created_at: string;
 }
 
@@ -32,11 +37,12 @@ export default function PlatformManagement() {
   const [editTarget, setEditTarget] = useState<Platform | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Platform | null>(null);
   const [name, setName] = useState("");
+  const [positionLabel, setPositionLabel] = useState<PositionLabel>("None");
   const [saving, setSaving] = useState(false);
 
   const fetchPlatforms = useCallback(async () => {
     const { data } = await supabase.from("platforms").select("*").order("name");
-    if (data) setPlatforms(data);
+    if (data) setPlatforms(data as Platform[]);
     setLoading(false);
   }, []);
 
@@ -45,13 +51,14 @@ export default function PlatformManagement() {
   const handleAdd = async () => {
     if (!name.trim()) return;
     setSaving(true);
-    const { error } = await supabase.from("platforms").insert({ name: name.trim() });
+    const { error } = await supabase.from("platforms").insert({ name: name.trim(), position_label: positionLabel });
     setSaving(false);
     if (error) {
       toast({ title: error.message.includes("duplicate") ? "Platform already exists" : error.message, variant: "destructive" });
     } else {
       toast({ title: "Platform added" });
       setName("");
+      setPositionLabel("None");
       setAddOpen(false);
       fetchPlatforms();
     }
@@ -60,7 +67,7 @@ export default function PlatformManagement() {
   const handleEdit = async () => {
     if (!editTarget || !name.trim()) return;
     setSaving(true);
-    const { error } = await supabase.from("platforms").update({ name: name.trim() }).eq("id", editTarget.id);
+    const { error } = await supabase.from("platforms").update({ name: name.trim(), position_label: positionLabel }).eq("id", editTarget.id);
     setSaving(false);
     if (error) {
       toast({ title: error.message.includes("duplicate") ? "Platform already exists" : error.message, variant: "destructive" });
@@ -68,13 +75,13 @@ export default function PlatformManagement() {
       toast({ title: "Platform updated" });
       setEditTarget(null);
       setName("");
+      setPositionLabel("None");
       fetchPlatforms();
     }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    // Check if platform is in use
     const { count } = await supabase
       .from("review_requests")
       .select("id", { count: "exact", head: true })
@@ -101,7 +108,7 @@ export default function PlatformManagement() {
           <h2 className="text-2xl font-bold text-foreground">Platforms</h2>
           <p className="text-sm text-muted-foreground mt-1">{platforms.length} platforms</p>
         </div>
-        <Button onClick={() => { setName(""); setAddOpen(true); }}>
+        <Button onClick={() => { setName(""); setPositionLabel("None"); setAddOpen(true); }}>
           <Plus className="w-4 h-4 mr-2" />
           Add Platform
         </Button>
@@ -123,6 +130,7 @@ export default function PlatformManagement() {
               <thead>
                 <tr className="border-b border-border bg-secondary/40">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Name</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Position Label</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground hidden md:table-cell">Created</th>
                   <th className="py-3 px-4 w-10"></th>
                 </tr>
@@ -131,6 +139,7 @@ export default function PlatformManagement() {
                 {platforms.map((p) => (
                   <tr key={p.id} className="border-b border-border/60 last:border-0 hover:bg-secondary/30 transition-colors">
                     <td className="py-3 px-4 font-medium text-foreground">{p.name}</td>
+                    <td className="py-3 px-4 text-muted-foreground">{p.position_label ?? "None"}</td>
                     <td className="py-3 px-4 text-muted-foreground hidden md:table-cell">
                       {format(new Date(p.created_at), "MMM d, yyyy")}
                     </td>
@@ -142,7 +151,7 @@ export default function PlatformManagement() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => { setEditTarget(p); setName(p.name); }}>
+                          <DropdownMenuItem onClick={() => { setEditTarget(p); setName(p.name); setPositionLabel((p.position_label ?? "None") as PositionLabel); }}>
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => setDeleteTarget(p)}>
@@ -166,9 +175,21 @@ export default function PlatformManagement() {
             <DialogTitle>Add Platform</DialogTitle>
             <DialogDescription>Add a new platform option for review requests.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Platform name" maxLength={100} />
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Platform name" maxLength={100} />
+            </div>
+            <div className="space-y-2">
+              <Label>Position Label</Label>
+              <Select value={positionLabel} onValueChange={(v) => setPositionLabel(v as PositionLabel)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {POSITION_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">If not "None", reviewers will enter a number with each note and notes are sorted by it.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
@@ -184,11 +205,22 @@ export default function PlatformManagement() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Platform</DialogTitle>
-            <DialogDescription>Rename this platform.</DialogDescription>
+            <DialogDescription>Update this platform's name and position label.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Platform name" maxLength={100} />
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Platform name" maxLength={100} />
+            </div>
+            <div className="space-y-2">
+              <Label>Position Label</Label>
+              <Select value={positionLabel} onValueChange={(v) => setPositionLabel(v as PositionLabel)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {POSITION_LABELS.map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
