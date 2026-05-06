@@ -181,21 +181,15 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
             You've reached the maximum of 3 passkeys. Remove one to add another.
           </p>
         ) : (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="passkey-label">Device name</Label>
-              <Input
-                id="passkey-label"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="My MacBook"
-                maxLength={80}
-              />
-            </div>
-            <Button onClick={() => setShowSetupConfirm(true)} disabled={submitting}>
-              {submitting ? "Setting up…" : keys.length === 0 ? "Set up Passkey" : "Add another passkey"}
-            </Button>
-          </>
+          <Button
+            onClick={() => {
+              setLabel("This device");
+              setShowSetupConfirm(true);
+            }}
+            disabled={submitting}
+          >
+            {submitting ? "Setting up…" : keys.length === 0 ? "Set up Passkey" : "Add another passkey"}
+          </Button>
         )}
       </CardContent>
 
