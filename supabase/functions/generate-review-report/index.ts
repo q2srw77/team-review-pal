@@ -237,17 +237,33 @@ Deno.serve(async (req) => {
     doc.setFontSize(10)
     if (notes && notes.length > 0) {
       for (const note of notes) {
-        checkPage(16)
+        checkPage(22)
         const authorName = noteAuthorNames.get(note.author_id) ?? 'Unknown'
         const date = new Date(note.created_at).toLocaleString('en-US', {
           month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
         })
 
+        // Render position badge (Slide/Step/Page) when applicable
+        if (positionLabel !== 'None' && note.position_number != null) {
+          const badgeText = `${positionLabel.toUpperCase()} ${note.position_number}`
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(9)
+          const textW = doc.getTextWidth(badgeText)
+          const padX = 2.5
+          const badgeW = textW + padX * 2
+          const badgeH = 5
+          doc.setFillColor(32, 6, 247)
+          doc.roundedRect(margin + 4, y - 4, badgeW, badgeH, 1.2, 1.2, 'F')
+          doc.setTextColor(255, 255, 255)
+          doc.text(badgeText, margin + 4 + padX, y - 0.3)
+          // reset
+          doc.setTextColor(0, 0, 0)
+          doc.setFontSize(10)
+          y += 4
+        }
+
         doc.setFont('helvetica', 'bold')
-        const prefix = positionLabel !== 'None' && note.position_number != null
-          ? `${positionLabel} ${note.position_number} — `
-          : ''
-        doc.text(`${prefix}${authorName} — ${date}`, margin + 4, y)
+        doc.text(`${authorName} — ${date}`, margin + 4, y)
         y += 5
 
         doc.setFont('helvetica', 'normal')
