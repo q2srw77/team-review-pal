@@ -37,7 +37,7 @@ export async function signInWithPasskey(email: string) {
     "passkey-auth-options",
     { body: { email, rpID } }
   );
-  if (optsErr) throw new Error(optsErr.message);
+  if (optsErr) throw new Error(optsData?.error || optsErr.message);
   if (!optsData?.options) throw new Error("Failed to get authentication options");
 
   const authResp = await startAuthentication(optsData.options);
@@ -46,7 +46,7 @@ export async function signInWithPasskey(email: string) {
     "passkey-auth-verify",
     { body: { response: authResp, rpID, origin } }
   );
-  if (verifyErr) throw new Error(verifyErr.message);
+  if (verifyErr) throw new Error(verifyData?.error || verifyErr.message);
   if (!verifyData?.ok || !verifyData?.token_hash) {
     throw new Error(verifyData?.error || "Sign-in failed");
   }
