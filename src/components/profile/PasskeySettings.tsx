@@ -57,6 +57,11 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
   const handleRegister = async () => {
     setSubmitting(true);
     try {
+      const { error: refreshErr } = await supabase.auth.refreshSession();
+      if (refreshErr) {
+        toast.error("Your session expired. Please sign in again.");
+        return;
+      }
       await registerPasskey(label.trim() || "This device");
       toast.success("Passkey added. Password sign-in is now disabled.");
       await load();

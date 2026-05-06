@@ -16,16 +16,19 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
   try {
     const auth = req.headers.get('Authorization')
-    if (!auth?.startsWith('Bearer ')) return json(401, { error: 'Unauthorized' })
+    console.log('register-options entry', { hasAuth: !!auth })
+    if (!auth?.startsWith('Bearer ')) return json(401, { error: 'Missing Authorization header' })
 
     const anon = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: auth } },
     })
-    const { data: claims, error: claimsErr } = await anon.auth.getClaims(auth.replace('Bearer ', ''))
-    if (claimsErr || !claims?.claims) return json(401, { error: 'Unauthorized' })
-
-    const userId = claims.claims.sub as string
-    const email = (claims.claims.email as string) ?? ''
+    const { data: userData, error: userErr } = await anon.auth.getUser()
+    if (userErr || !userData?.user) {
+      console.error('register-options auth failed', userErr)
+      return json(401, { error: 'Session expired. Please sign in again and retry.' })
+    }
+    const userId = userData.user.id
+    const email = userData.user.email ?? ''
 
     const body = await req.json().catch(() => ({}))
     const rpID = String(body?.rpID || '')
