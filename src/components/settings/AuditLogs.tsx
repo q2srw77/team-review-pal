@@ -132,20 +132,41 @@ export default function AuditLogs() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 className="text-xl font-bold tracking-tight">Audit Logs</h2>
-        <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); setPage(0); }}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Filter by action" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Actions</SelectItem>
-            <SelectItem value="created">Created</SelectItem>
-            <SelectItem value="updated">Updated</SelectItem>
-            <SelectItem value="deleted">Deleted</SelectItem>
-            <SelectItem value="review_status_changed">Status Changed</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search action, entity, or user…"
+              className="pl-8 pr-8 h-9"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); setPage(0); }}>
+            <SelectTrigger className="w-full sm:w-48 h-9">
+              <SelectValue placeholder="Filter by action" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Actions</SelectItem>
+              <SelectItem value="created">Created</SelectItem>
+              <SelectItem value="updated">Updated</SelectItem>
+              <SelectItem value="deleted">Deleted</SelectItem>
+              <SelectItem value="review_status_changed">Status Changed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="border rounded-lg">
