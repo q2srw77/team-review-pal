@@ -30,11 +30,14 @@ import type { Database } from "@/integrations/supabase/types";
 type ReviewRequest = Database["public"]["Tables"]["review_requests"]["Row"];
 type RequestStatus = Database["public"]["Enums"]["request_status"];
 
+type PositionLabel = "None" | "Slide" | "Step" | "Page";
+
 interface Note {
   id: string;
   content: string;
   created_at: string;
   author_name: string;
+  position_number: number | null;
 }
 
 interface ReviewerStatus {
