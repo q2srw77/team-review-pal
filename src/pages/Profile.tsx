@@ -58,8 +58,8 @@ export default function Profile({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-card border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
+      <header className="sticky top-0 z-30 bg-card/80 backdrop-blur border-b border-border shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -67,7 +67,7 @@ export default function Profile({ onBack }: { onBack: () => void }) {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8 space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
