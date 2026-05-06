@@ -1,32 +1,39 @@
-# Diagnose passkey sign-in failure
+## Diagnosis
 
-You authenticated with the passkey (the OS prompt succeeded), so the failure is happening server-side in `passkey-auth-verify` (or in the magic-link mint step). Today the client throws a generic "non-2xx" error and the server only logs at the `catch` boundary, so we can't see which guard rejected the request.
+The edge-function logs and database state tell a clear story:
 
-## Plan
+**From the logs** (`reviewhub.cyphersecurity.us`, `steve.weber@sophos.com`):
+- `auth-options` returned `allowCount: 0` — the server found **zero** registered passkeys for this email.
+- The browser still showed Touch ID anyway and sent a credential with id `voCK-CkDX...`.
+- `auth-verify` looked that credential up and got `found: false` → returns **"Unknown passkey"** (400).
 
-### 1. Surface the real server error in the client
-In `src/lib/passkeys.ts`, `signInWithPasskey()` currently throws `optsErr.message` / `verifyErr.message`, which for `supabase.functions.invoke` is just `"Edge Function returned a non-2xx status code"`. Update both invoke calls to also read `data?.error` (the JSON body is delivered even on non-2xx) and prefer that message in the thrown `Error`. Same fix for `registerPasskey` for symmetry.
+**From the database**:
+- `user_passkeys` is **completely empty** (0 rows total).
+- The profile `steve.weber@sophos.com` exists but has 0 passkeys linked.
+- There are 3 stored authentication challenges and only 1 registration challenge — meaning a registration was attempted but never completed end-to-end (no row landed in `user_passkeys`).
 
-### 2. Add checkpoint logs to `passkey-auth-verify`
-Insert `console.log` statements at each decision point so the next failure tells us exactly which branch fired:
-- after parsing body: log `{ rpID, origin, hasResponse, credentialId }`
-- after challenge lookup: log `{ found, expired, used }`
-- after credential lookup: log `{ found, userId }`
-- after `verifyAuthenticationResponse`: log `{ verified, newCounter }`
-- before `generateLink`: log `{ email }`; on error log full `linkErr`
+So the failure is **not** an RP ID mismatch or a verify-step bug. The passkey simply does not exist server-side. The browser/OS keychain is happy to present a credential it has cached locally (from a previous registration attempt — possibly on the `lovableproject.com` preview domain, which has a different RP ID and therefore wouldn't match anyway), but our DB has nothing to match it to.
 
-### 3. Add checkpoint logs to `passkey-auth-options`
-- log `{ email, rpID, allowCount }` so we can confirm the credential list isn't empty
+### Why the registration probably didn't persist
 
-### 4. Re-test and read logs
-After deploy, retry sign-in on `reviewhub.cyphersecurity.us`. The next message will include edge-function logs that pinpoint the failing branch (most likely candidates: `Unknown passkey` due to a credential_id encoding mismatch, `Verification failed` due to RP ID mismatch on the custom domain, or `generateLink` failing).
+Looking at `passkey-register-verify`, the row is inserted only after `verifyRegistrationResponse` succeeds AND the password rotation succeeds. If either step failed, the registration silently doesn't save. We have no register-verify logs to confirm which (the edge function shut down before the latest attempt), so we can't tell from logs alone — but the empty `user_passkeys` table is the smoking gun.
 
-### 5. Fix based on findings
-Ship the targeted fix in a follow-up turn once the logs identify the branch. No speculative changes now.
+## What to do
 
-## Files touched
-- `src/lib/passkeys.ts` — better error extraction
-- `supabase/functions/passkey-auth-verify/index.ts` — checkpoint logs
-- `supabase/functions/passkey-auth-options/index.ts` — checkpoint logs
+No code change is needed yet — the bug is operational, not in the verify path. Two-step recovery:
 
-No DB or schema changes.
+1. **Remove the stale OS-level credential** for `reviewhub.cyphersecurity.us` (and `team-review-pal.lovable.app` / `lovableproject.com` if any) from the device's password/passkey manager (macOS: System Settings → Passwords; Chrome: chrome://settings/passkeys). Otherwise the browser will keep offering the orphaned credential and verify will keep failing with "Unknown passkey".
+2. **Re-register the passkey** while signed in on `reviewhub.cyphersecurity.us` (Profile → Passkey → Set up Passkey). After the prompt completes, we should see a new row in `user_passkeys` and `auth-options` should return `allowCount: 1`.
+
+## If re-registration also fails
+
+That would mean `passkey-register-verify` is rejecting or the password-rotation rollback is firing. To pinpoint it next round I'd:
+
+- Add explicit checkpoint logs to `passkey-register-verify` (challenge lookup result, `verification.verified`, insert error, password-rotation error) — same pattern we just added to the auth functions.
+- Have you retry registration so we capture a full trace.
+
+## Files involved (no edits in this plan)
+
+- `supabase/functions/passkey-register-verify/index.ts` — only place that writes to `user_passkeys`
+- `supabase/functions/passkey-auth-options/index.ts` — confirmed returning `allowCount: 0`
+- `supabase/functions/passkey-auth-verify/index.ts` — confirmed rejecting at credential lookup

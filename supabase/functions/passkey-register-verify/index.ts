@@ -39,6 +39,8 @@ Deno.serve(async (req) => {
       : null
     if (!expectedChallenge) return json(400, { error: 'Bad clientDataJSON' })
 
+    console.log('register-verify start', { userId, rpID, origin, hasResponse: !!response })
+
     const { data: ch } = await admin
       .from('passkey_challenges')
       .select('id, expires_at, used_at')
@@ -46,6 +48,8 @@ Deno.serve(async (req) => {
       .eq('type', 'registration')
       .eq('user_id', userId)
       .maybeSingle()
+
+    console.log('register-verify challenge', { found: !!ch, used: !!ch?.used_at, expired: ch ? new Date(ch.expires_at).getTime() < Date.now() : null })
 
     if (!ch || ch.used_at || new Date(ch.expires_at).getTime() < Date.now()) {
       return json(400, { error: 'Challenge invalid or expired' })
@@ -57,6 +61,8 @@ Deno.serve(async (req) => {
       expectedOrigin: origin,
       expectedRPID: rpID,
     })
+
+    console.log('register-verify webauthn', { verified: verification.verified, hasInfo: !!verification.registrationInfo })
 
     if (!verification.verified || !verification.registrationInfo) {
       return json(400, { error: 'Verification failed' })
