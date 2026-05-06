@@ -244,7 +244,10 @@ Deno.serve(async (req) => {
         })
 
         doc.setFont('helvetica', 'bold')
-        doc.text(`${authorName} — ${date}`, margin + 4, y)
+        const prefix = positionLabel !== 'None' && note.position_number != null
+          ? `${positionLabel} ${note.position_number} — `
+          : ''
+        doc.text(`${prefix}${authorName} — ${date}`, margin + 4, y)
         y += 5
 
         doc.setFont('helvetica', 'normal')
