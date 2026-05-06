@@ -85,6 +85,7 @@ Deno.serve(async (req) => {
     // Mint a session: generate a magic link, return token_hash for client to verifyOtp
     const { data: user } = await admin.auth.admin.getUserById(key.user_id)
     const email = user?.user?.email
+    console.log('auth-verify mint link', { userId: key.user_id, hasEmail: !!email })
     if (!email) return json(500, { error: 'No email for user' })
 
     const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
@@ -93,7 +94,7 @@ Deno.serve(async (req) => {
     })
     if (linkErr || !link?.properties) {
       console.error('generateLink failed', linkErr)
-      return json(500, { error: 'Could not create session' })
+      return json(500, { error: linkErr?.message || 'Could not create session' })
     }
 
     return json(200, {
