@@ -127,6 +127,7 @@ export default function Profile({ onBack }: { onBack: () => void }) {
             )}
           </CardContent>
         </Card>
+        </div>
 
         <Card>
           <CardHeader>
