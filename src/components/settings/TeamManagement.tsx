@@ -146,43 +146,74 @@ export default function TeamManagement() {
       (teamMembers ?? []).map((m) => ({ ...m, profile: profileMap.get(m.user_id) }))
     );
     setAllProfiles(profiles ?? []);
-    setSelectedUserIds([]);
-    setMemberSearch("");
+    setSelectedAvailable([]);
+    setSelectedAssigned([]);
+    setAvailableSearch("");
+    setAssignedSearch("");
     setMembersLoading(false);
   };
 
-  const addMember = async () => {
-    if (!membersTarget || selectedUserIds.length === 0) return;
-    const rows = selectedUserIds.map(uid => ({ team_id: membersTarget.id, user_id: uid }));
+  const refreshMembers = async (teamId: string) => {
+    const { data: teamMembers } = await supabase.from("team_members").select("*").eq("team_id", teamId);
+    const profileMap = new Map(allProfiles.map((p) => [p.user_id, p]));
+    setMembers((teamMembers ?? []).map((m) => ({ ...m, profile: profileMap.get(m.user_id) })));
+    setSelectedAvailable([]);
+    setSelectedAssigned([]);
+  };
+
+  const addMembers = async (userIds: string[]) => {
+    if (!membersTarget || userIds.length === 0) return;
+    const rows = userIds.map(uid => ({ team_id: membersTarget.id, user_id: uid }));
     const { error } = await supabase.from("team_members").insert(rows);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: `${selectedUserIds.length} member(s) added` });
-    openMembers(membersTarget);
+    toast({ title: `${userIds.length} member(s) added` });
+    await refreshMembers(membersTarget.id);
     fetchTeams();
   };
 
-  const removeMember = async (memberId: string) => {
-    if (!membersTarget) return;
-    const { error } = await supabase.from("team_members").delete().eq("id", memberId);
+  const removeMembersByUserIds = async (userIds: string[]) => {
+    if (!membersTarget || userIds.length === 0) return;
+    const { error } = await supabase
+      .from("team_members")
+      .delete()
+      .eq("team_id", membersTarget.id)
+      .in("user_id", userIds);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Member removed" });
-    openMembers(membersTarget);
+    toast({ title: `${userIds.length} member(s) removed` });
+    await refreshMembers(membersTarget.id);
     fetchTeams();
   };
 
   const existingUserIds = new Set(members.map((m) => m.user_id));
   const availableProfiles = allProfiles.filter((p) => !existingUserIds.has(p.user_id));
-  const filteredProfiles = availableProfiles.filter((p) => {
-    if (!memberSearch.trim()) return true;
-    const q = memberSearch.toLowerCase();
+  const filteredAvailable = availableProfiles.filter((p) => {
+    if (!availableSearch.trim()) return true;
+    const q = availableSearch.toLowerCase();
     return p.full_name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q);
   });
+  const filteredAssigned = members.filter((m) => {
+    if (!assignedSearch.trim()) return true;
+    const q = assignedSearch.toLowerCase();
+    return m.profile?.full_name?.toLowerCase().includes(q) || m.profile?.email?.toLowerCase().includes(q);
+  });
+
+  const initials = (name?: string, email?: string) => {
+    const src = (name || email || "?").trim();
+    const parts = src.split(/\s+/);
+    return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase() || src[0]?.toUpperCase() || "?";
+  };
+
+  const allFilteredAvailableSelected =
+    filteredAvailable.length > 0 && filteredAvailable.every(p => selectedAvailable.includes(p.user_id));
+  const allFilteredAssignedSelected =
+    filteredAssigned.length > 0 && filteredAssigned.every(m => selectedAssigned.includes(m.user_id));
+
 
   return (
     <div>
