@@ -258,7 +258,7 @@ export default function RequestDetail({
     if (!request) return;
     const { data } = await supabase
       .from("request_notes")
-      .select("id, content, created_at, author_id")
+      .select("id, content, created_at, author_id, position_number")
       .eq("request_id", request.id)
       .order("created_at", { ascending: true });
 
@@ -273,28 +273,40 @@ export default function RequestDetail({
     const nameMap = new Map(profiles?.map((p) => [p.user_id, p.full_name]) ?? []);
 
     setNotes(
-      data.map((n) => ({
+      data.map((n: { id: string; content: string; created_at: string; author_id: string; position_number: number | null }) => ({
         id: n.id,
         content: n.content,
         created_at: n.created_at,
         author_name: nameMap.get(n.author_id) ?? "Unknown",
+        position_number: n.position_number,
       }))
     );
   };
 
   const addNote = async () => {
     if (!request || !user || !newNote.trim()) return;
+    let positionNumber: number | null = null;
+    if (positionLabel !== "None") {
+      const n = parseInt(newNotePosition, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 999) {
+        toast({ title: "Number required", description: `Enter a ${positionLabel.toLowerCase()} number (1–999).`, variant: "destructive" });
+        return;
+      }
+      positionNumber = n;
+    }
     setSubmitting(true);
     const { error } = await supabase.from("request_notes").insert({
       request_id: request.id,
       author_id: user.id,
       content: newNote.trim(),
+      position_number: positionNumber,
     });
     setSubmitting(false);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
       setNewNote("");
+      setNewNotePosition("");
       fetchNotes();
     }
   };
