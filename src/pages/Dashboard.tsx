@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import RequestForm from "@/components/RequestForm";
@@ -6,8 +6,10 @@ import RequestDetail from "@/components/RequestDetail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle, User } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClipboardCheck, LogOut, Settings, Calendar, Download, AlertTriangle, User, Search, X } from "lucide-react";
 import { format, differenceInCalendarDays } from "date-fns";
 import type { Database } from "@/integrations/supabase/types";
 
