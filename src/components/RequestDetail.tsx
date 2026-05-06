@@ -102,6 +102,11 @@ export default function RequestDetail({
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  useEffect(() => {
+    if (!open) setIsFullScreen(false);
+  }, [open, request?.id]);
 
   useEffect(() => {
     if (!request || !open) return;
