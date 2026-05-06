@@ -701,7 +701,7 @@ export default function RequestDetail({
                   <div className="flex items-center justify-between mb-1 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       {positionLabel !== "None" && note.position_number != null && editingNoteId !== note.id && (
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide shrink-0">
+                        <Badge className="text-[10px] uppercase tracking-wide shrink-0 font-bold text-white border-transparent hover:opacity-90" style={{ backgroundColor: "#2006F7" }}>
                           {positionLabel} {note.position_number}
                         </Badge>
                       )}
