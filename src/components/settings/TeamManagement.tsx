@@ -66,8 +66,10 @@ export default function TeamManagement() {
   const [membersTarget, setMembersTarget] = useState<Team | null>(null);
   const [members, setMembers] = useState<(TeamMember & { profile?: Profile })[]>([]);
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [memberSearch, setMemberSearch] = useState("");
+  const [selectedAvailable, setSelectedAvailable] = useState<string[]>([]);
+  const [selectedAssigned, setSelectedAssigned] = useState<string[]>([]);
+  const [availableSearch, setAvailableSearch] = useState("");
+  const [assignedSearch, setAssignedSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(false);
 
   const fetchTeams = useCallback(async () => {
