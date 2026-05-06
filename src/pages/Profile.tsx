@@ -22,6 +22,7 @@ export default function Profile({ onBack }: { onBack: () => void }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [hasPasskeys, setHasPasskeys] = useState(false);
 
   useEffect(() => {
     if (!user) return;
