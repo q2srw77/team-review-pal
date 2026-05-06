@@ -71,6 +71,7 @@ export default function TeamManagement() {
   const [availableSearch, setAvailableSearch] = useState("");
   const [assignedSearch, setAssignedSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(false);
+  const [removeConfirm, setRemoveConfirm] = useState<{ userIds: string[]; label: string } | null>(null);
 
   const fetchTeams = useCallback(async () => {
     setLoading(true);
