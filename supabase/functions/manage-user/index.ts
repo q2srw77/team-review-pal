@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
         const { error: authError } = await supabase.auth.admin.updateUserById(user_id, authUpdate);
         if (authError) {
           return new Response(JSON.stringify({ error: authError.message }), {
-            status: 500,
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
