@@ -26,9 +26,9 @@ export async function registerPasskey(deviceLabel: string) {
   );
   if (optsErr) throw new Error(await readInvokeError(optsErr, "Failed to get registration options"));
   if (optsData?.error) throw new Error(optsData.error);
-  if (!optsData?.options) throw new Error("Failed to get registration options");
+  if (!optsData?.options?.challenge) throw new Error("Failed to get registration options");
 
-  const attResp = await startRegistration(optsData.options);
+  const attResp = await startRegistration({ optionsJSON: optsData.options });
 
   const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
     "passkey-register-verify",
@@ -49,9 +49,9 @@ export async function signInWithPasskey(email: string) {
   );
   if (optsErr) throw new Error(await readInvokeError(optsErr, "Failed to get authentication options"));
   if (optsData?.error) throw new Error(optsData.error);
-  if (!optsData?.options) throw new Error("Failed to get authentication options");
+  if (!optsData?.options?.challenge) throw new Error("Failed to get authentication options");
 
-  const authResp = await startAuthentication(optsData.options);
+  const authResp = await startAuthentication({ optionsJSON: optsData.options });
 
   const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
     "passkey-auth-verify",
