@@ -77,7 +77,9 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
     const remaining = keys.filter((k) => k.id !== id);
     if (remaining.length === 0 && user) {
       await supabase.from("profiles").update({ password_disabled: false }).eq("user_id", user.id);
-      toast.success("Passkey removed. Password sign-in re-enabled.");
+      toast.success("Passkey removed.", {
+        description: "Use Forgot Password on the sign-in screen to set a new password before signing in again.",
+      });
     } else {
       toast.success("Passkey removed.");
     }
@@ -171,7 +173,7 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
             <AlertDialogTitle>Remove this passkey?</AlertDialogTitle>
             <AlertDialogDescription>
               {keys.length === 1
-                ? "This is your only passkey. Removing it will re-enable password sign-in for your account."
+                ? "This is your only passkey. Your password was rotated when you set it up, so you'll need to use Forgot Password on the sign-in screen to set a new password before you can sign in again."
                 : "You can still sign in with your other passkeys."}
             </AlertDialogDescription>
           </AlertDialogHeader>
