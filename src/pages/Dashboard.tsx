@@ -131,19 +131,21 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
+      <header className="sticky top-0 z-30 bg-card/80 backdrop-blur border-b border-border shadow-sm">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center shrink-0">
               <ClipboardCheck className="w-5 h-5 text-primary-foreground" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight text-foreground"><h1 className="text-lg font-bold tracking-tight text-foreground">Review Hub</h1></h1>
-            {(roles.includes("admin") ? ["admin"] : roles).map(role => (
-              <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">{role}</Badge>
-            ))}
+            <h1 className="text-lg font-bold tracking-tight text-foreground truncate">Review Hub</h1>
+            <div className="hidden sm:flex items-center gap-1.5">
+              {(roles.includes("admin") ? ["admin"] : roles).map(role => (
+                <Badge key={role} variant="outline" className="text-xs border-accent text-accent capitalize">{role}</Badge>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:inline">{profileName}</span>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <span className="text-sm text-muted-foreground hidden md:inline">{profileName}</span>
             {onNavigateProfile && (
               <Button variant="ghost" size="icon" onClick={onNavigateProfile} title="Profile">
                 <User className="w-4 h-4" />
@@ -159,8 +161,8 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Review Requests</h2>
             <p className="text-sm text-muted-foreground mt-1">{requests.length} {view} requests</p>
@@ -168,17 +170,19 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
           <RequestForm onCreated={fetchRequests} />
         </div>
 
-        <div className="flex gap-2 mb-4">
+        <div className="inline-flex rounded-lg border border-border bg-card p-1 mb-4">
           <Button
-            variant={view === "active" ? "default" : "outline"}
+            variant={view === "active" ? "default" : "ghost"}
             size="sm"
+            className="rounded-md"
             onClick={() => setView("active")}
           >
             Active ({activeRequests.length})
           </Button>
           <Button
-            variant={view === "completed" ? "default" : "outline"}
+            variant={view === "completed" ? "default" : "ghost"}
             size="sm"
+            className="rounded-md"
             onClick={() => setView("completed")}
           >
             Completed ({completedRequests.length})
@@ -192,7 +196,7 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
             <p className="text-sm text-muted-foreground mt-1">Submit the first one to get started.</p>
           </Card>
         ) : (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
