@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Trash2, Lock } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Trash2, Lock, Maximize2, Minimize2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -102,6 +102,11 @@ export default function RequestDetail({
   const [platforms, setPlatforms] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  useEffect(() => {
+    if (!open) setIsFullScreen(false);
+  }, [open, request?.id]);
 
   useEffect(() => {
     if (!request || !open) return;
@@ -430,7 +435,23 @@ export default function RequestDetail({
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
+      <SheetContent
+        className={cn(
+          "overflow-y-auto",
+          isFullScreen
+            ? "w-screen max-w-none sm:max-w-none"
+            : "sm:max-w-lg"
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setIsFullScreen((v) => !v)}
+          className="absolute right-12 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          aria-label={isFullScreen ? "Exit full screen" : "Enter full screen"}
+          title={isFullScreen ? "Exit full screen" : "Enter full screen"}
+        >
+          {isFullScreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
         <SheetHeader>
           <div className="flex items-start justify-between gap-2 pr-8">
             <SheetTitle className="text-xl flex-1">
