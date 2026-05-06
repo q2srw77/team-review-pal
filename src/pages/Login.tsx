@@ -64,8 +64,8 @@ export default function Login() {
     e.preventDefault();
     if (passkeyOnly) {
       toast({
-        title: "This account uses a passkey",
-        description: "Please sign in with your passkey instead.",
+        title: "Passkey Login Required",
+        description: "This account is secured with a passkey. Please use Sign in with Passkey.",
         variant: "destructive",
       });
       return;
@@ -74,7 +74,23 @@ export default function Login() {
     try {
       await signIn(email, password);
     } catch (err: any) {
-      toast({ title: "Login failed", description: err.message, variant: "destructive" });
+      // Re-check in case lookup was stale or skipped
+      const trimmed = email.trim().toLowerCase();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("password_disabled")
+        .eq("email", trimmed)
+        .maybeSingle();
+      if (profile?.password_disabled) {
+        setPasskeyOnly(true);
+        toast({
+          title: "Passkey Login Required",
+          description: "This account is secured with a passkey. Please use Sign in with Passkey.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Login failed", description: err.message, variant: "destructive" });
+      }
     } finally {
       setSubmitting(false);
     }

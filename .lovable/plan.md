@@ -1,8 +1,7 @@
-Update `src/components/profile/PasskeySettings.tsx`:
+Update `src/pages/Login.tsx` so the password sign-in failure toast says "Passkey Login Required for this account" when the email belongs to a passkey-protected profile.
 
-1. Remove the always-visible "Device name" Label + Input from the card body. Keep only the "Set up Passkey" / "Add another passkey" button.
-2. Move the device name field into the existing `showSetupConfirm` AlertDialog so it's the first thing the user sees after clicking the button.
-3. The dialog Continue action stays disabled until the name is non-empty (trimmed). On Continue, pass the entered name to `registerPasskey(...)` as today.
-4. Reset the name back to "This device" each time the dialog opens so it doesn't carry stale values across sessions.
+1. In `handlePasswordSubmit`'s catch block, before showing the generic "Login failed" toast, check `passkeyOnly`. If true, show toast titled "Passkey Login Required" with description "This account is secured with a passkey. Please use Sign in with Passkey."
+2. As a safety net (passkeyOnly may be stale if the user typed a different email or the lookup failed), re-query `profiles.password_disabled` by the trimmed email on failure and use that result to decide which toast to show.
+3. Apply the same wording to the existing pre-submit guard at the top of `handlePasswordSubmit` for consistency.
 
 No backend changes.
