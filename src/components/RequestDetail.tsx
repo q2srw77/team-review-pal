@@ -317,6 +317,43 @@ export default function RequestDetail({
     }
   };
 
+  const startEditNote = (note: Note) => {
+    setEditingNoteId(note.id);
+    setEditNoteContent(note.content);
+    setEditNotePosition(note.position_number != null ? String(note.position_number) : "");
+  };
+
+  const cancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditNoteContent("");
+    setEditNotePosition("");
+  };
+
+  const saveEditNote = async (noteId: string) => {
+    if (!editNoteContent.trim()) return;
+    let positionNumber: number | null = null;
+    if (positionLabel !== "None") {
+      const n = parseInt(editNotePosition, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 999) {
+        toast({ title: "Number required", description: `Enter a ${positionLabel.toLowerCase()} number (1–999).`, variant: "destructive" });
+        return;
+      }
+      positionNumber = n;
+    }
+    setSavingNote(true);
+    const { error } = await supabase
+      .from("request_notes")
+      .update({ content: editNoteContent.trim(), position_number: positionNumber })
+      .eq("id", noteId);
+    setSavingNote(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      cancelEditNote();
+      fetchNotes();
+    }
+  };
+
   const updateMyReviewStatus = async (newStatus: string) => {
     if (!request || !user) return;
     if (request.status === "completed") {
