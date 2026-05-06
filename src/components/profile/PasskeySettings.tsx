@@ -234,6 +234,30 @@ export default function PasskeySettings({ onChange }: { onChange?: (hasPasskeys:
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!renameId} onOpenChange={(o) => !o && setRenameId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename passkey</DialogTitle>
+            <DialogDescription>Give this passkey a name you'll recognize.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            maxLength={80}
+            placeholder="My MacBook"
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameId(null)} disabled={renaming}>
+              Cancel
+            </Button>
+            <Button onClick={handleRename} disabled={renaming || !renameValue.trim()}>
+              {renaming ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
