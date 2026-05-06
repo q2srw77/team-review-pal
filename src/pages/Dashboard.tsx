@@ -203,73 +203,75 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
           <RequestForm onCreated={fetchRequests} />
         </div>
 
-        <div className="inline-flex rounded-lg border border-border bg-card p-1 mb-4">
-          <Button
-            variant={view === "active" ? "default" : "ghost"}
-            size="sm"
-            className="rounded-md"
-            onClick={() => setView("active")}
-          >
-            Active ({activeRequests.length})
-          </Button>
-          <Button
-            variant={view === "completed" ? "default" : "ghost"}
-            size="sm"
-            className="rounded-md"
-            onClick={() => setView("completed")}
-          >
-            Completed ({completedRequests.length})
-          </Button>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title…"
-              className="pl-9 pr-9"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-secondary text-muted-foreground"
-                aria-label="Clear search"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+          <div className="inline-flex rounded-lg border border-border bg-card p-1 self-start">
+            <Button
+              variant={view === "active" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-md"
+              onClick={() => setView("active")}
+            >
+              Active ({activeRequests.length})
+            </Button>
+            <Button
+              variant={view === "completed" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-md"
+              onClick={() => setView("completed")}
+            >
+              Completed ({completedRequests.length})
+            </Button>
           </div>
-          <Select value={platformFilter} onValueChange={setPlatformFilter}>
-            <SelectTrigger className="sm:w-48">
-              <SelectValue placeholder="All platforms" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All platforms</SelectItem>
-              {platformOptions.map((p) => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {view === "active" && (
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="sm:w-44">
-                <SelectValue placeholder="All statuses" />
+
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <div className="relative w-full sm:w-56 lg:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search title…"
+                className="pl-9 pr-9 h-9"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-secondary text-muted-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <Select value={platformFilter} onValueChange={setPlatformFilter}>
+              <SelectTrigger className="w-40 h-9">
+                <SelectValue placeholder="All platforms" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in_review">In Review</SelectItem>
+                <SelectItem value="all">All platforms</SelectItem>
+                {platformOptions.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
-          )}
-          {filtersActive && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="sm:self-stretch">
-              Clear
-            </Button>
-          )}
+            {view === "active" && (
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-36 h-9">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_review">In Review</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            {filtersActive && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
 
         {requests.length === 0 ? (
