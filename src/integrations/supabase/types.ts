@@ -274,28 +274,46 @@ export type Database = {
       }
       request_notes: {
         Row: {
+          archived: boolean
           author_id: string
           content: string
           created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision: string
           id: string
           position_number: number | null
+          rejection_comment: string | null
           request_id: string
+          round_number: number
         }
         Insert: {
+          archived?: boolean
           author_id: string
           content: string
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string
           id?: string
           position_number?: number | null
+          rejection_comment?: string | null
           request_id: string
+          round_number?: number
         }
         Update: {
+          archived?: boolean
           author_id?: string
           content?: string
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision?: string
           id?: string
           position_number?: number | null
+          rejection_comment?: string | null
           request_id?: string
+          round_number?: number
         }
         Relationships: [
           {
@@ -344,6 +362,7 @@ export type Database = {
           closed_reason: string | null
           complete_by: string | null
           created_at: string
+          current_round: number
           id: string
           notes: string
           platform: string
@@ -359,6 +378,7 @@ export type Database = {
           closed_reason?: string | null
           complete_by?: string | null
           created_at?: string
+          current_round?: number
           id?: string
           notes?: string
           platform: string
@@ -374,6 +394,7 @@ export type Database = {
           closed_reason?: string | null
           complete_by?: string | null
           created_at?: string
+          current_round?: number
           id?: string
           notes?: string
           platform?: string
