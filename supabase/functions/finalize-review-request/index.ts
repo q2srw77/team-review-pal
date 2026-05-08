@@ -147,9 +147,10 @@ Deno.serve(async (req) => {
         : Promise.resolve({ data: null }),
     ]);
 
+    let emailWarning: string | null = null;
     if (submitter?.email) {
       try {
-        await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
+        const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -172,14 +173,23 @@ Deno.serve(async (req) => {
             },
           }),
         });
+        if (!emailRes.ok) {
+          const body = await emailRes.text();
+          console.error("send-transactional-email non-2xx", emailRes.status, body);
+          emailWarning = `Email send failed (${emailRes.status})`;
+        }
       } catch (e) {
         console.error("send finalize email failed", e);
+        emailWarning = "Email send failed";
       }
+    } else {
+      emailWarning = "No submitter email on file";
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: true, pdfWarning, emailWarning }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (err) {
     console.error("finalize-review-request error", err);
     return new Response(JSON.stringify({ error: (err as Error).message }), {
