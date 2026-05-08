@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useTheme } from "@/hooks/useTheme";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Settings from "@/pages/Settings";
