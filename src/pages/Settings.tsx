@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardCheck, Users, Layers, UsersRound, FileText, Mail } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, Users, Layers, UsersRound, FileText, Mail, Palette } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
@@ -18,13 +18,15 @@ import PlatformManagement from "@/components/settings/PlatformManagement";
 import TeamManagement from "@/components/settings/TeamManagement";
 import AuditLogs from "@/components/settings/AuditLogs";
 import EmailLogs from "@/components/settings/EmailLogs";
+import ThemeSettings from "@/components/settings/ThemeSettings";
 
-type Section = "users" | "platforms" | "teams" | "audit-logs" | "email-logs";
+type Section = "users" | "platforms" | "teams" | "theme" | "audit-logs" | "email-logs";
 
 const NAV_ITEMS: { title: string; section: Section; icon: React.ElementType }[] = [
   { title: "Users", section: "users", icon: Users },
   { title: "Teams", section: "teams", icon: UsersRound },
   { title: "Platforms", section: "platforms", icon: Layers },
+  { title: "Theme", section: "theme", icon: Palette },
   { title: "Audit Logs", section: "audit-logs", icon: FileText },
   { title: "Email Logs", section: "email-logs", icon: Mail },
 ];
@@ -77,6 +79,7 @@ export default function Settings({ onBack }: { onBack: () => void }) {
             {active === "users" && <UserManagement />}
             {active === "teams" && <TeamManagement />}
             {active === "platforms" && <PlatformManagement />}
+            {active === "theme" && <ThemeSettings />}
             {active === "audit-logs" && <AuditLogs />}
             {active === "email-logs" && <EmailLogs />}
           </main>

@@ -12,6 +12,7 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "theme-preference";
+const USER_OVERRIDE_KEY = "theme-user-override";
 
 function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
@@ -21,22 +22,46 @@ function getInitialTheme(): Theme {
 }
 
 function applyTheme(theme: Theme) {
-  const root = document.documentElement;
-  root.classList.toggle("dark", theme === "dark");
+  document.documentElement.classList.toggle("dark", theme === "dark");
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  const [userPrefLoaded, setUserPrefLoaded] = useState(false);
 
   useEffect(() => {
     applyTheme(theme);
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  // Load saved preference from profile when user logs in
+  // Load app-wide default theme (used when user has no override)
   useEffect(() => {
-    if (!user) return;
+    let cancelled = false;
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "default_theme")
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        const val = (data as { value?: unknown } | null)?.value;
+        const def = val === "dark" ? "dark" : val === "light" ? "light" : null;
+        if (!def) return;
+        // Only apply default if no per-user override and user hasn't loaded their pref
+        if (!user && localStorage.getItem(USER_OVERRIDE_KEY) !== "1") {
+          setTheme(def);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Load saved user preference when logged in
+  useEffect(() => {
+    if (!user) {
+      setUserPrefLoaded(false);
+      return;
+    }
     supabase
       .from("user_settings")
       .select("theme_preference")
@@ -44,13 +69,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .maybeSingle()
       .then(({ data }) => {
         const pref = (data as { theme_preference?: Theme } | null)?.theme_preference;
-        if (pref === "light" || pref === "dark") setTheme(pref);
+        if (pref === "light" || pref === "dark") {
+          setTheme(pref);
+          localStorage.setItem(USER_OVERRIDE_KEY, "1");
+        }
+        setUserPrefLoaded(true);
       });
   }, [user]);
 
   const toggleTheme = () => {
     setTheme((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
+      localStorage.setItem(USER_OVERRIDE_KEY, "1");
       if (user) {
         supabase
           .from("user_settings")
