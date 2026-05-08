@@ -785,7 +785,7 @@ export default function RequestDetail({
                           </span>
                         )}
                       </div>
-                      {isMe && isReviewer && request.status !== "completed" ? (
+                      {isMe && isReviewer && !isLocked ? (
                         <Select value={rs.status} onValueChange={updateMyReviewStatus}>
                           <SelectTrigger className="h-7 w-32 text-xs">
                             <SelectValue />
