@@ -44,3 +44,10 @@ verify_jwt = false
 
 [functions.account-recovery-passkeys]
 verify_jwt = false
+
+[functions.resubmit-for-review]
+verify_jwt = false
+
+[functions.finalize-review-request]
+verify_jwt = false
+
