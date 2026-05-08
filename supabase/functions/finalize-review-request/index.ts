@@ -103,8 +103,9 @@ Deno.serve(async (req) => {
     if (request.report_pdf_path) {
       await service.from("review_requests").update({ report_pdf_path: null }).eq("id", request_id);
     }
+    let pdfWarning: string | null = null;
     try {
-      await fetch(`${supabaseUrl}/functions/v1/generate-review-report`, {
+      const pdfRes = await fetch(`${supabaseUrl}/functions/v1/generate-review-report`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -113,8 +114,14 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({ request_id, skip_email: true }),
       });
+      if (!pdfRes.ok) {
+        const body = await pdfRes.text();
+        console.error("generate-review-report non-2xx", pdfRes.status, body);
+        pdfWarning = `PDF generation failed (${pdfRes.status})`;
+      }
     } catch (e) {
       console.error("generate-review-report failed", e);
+      pdfWarning = "PDF generation failed";
     }
 
     // Get fresh report path + signed URL
