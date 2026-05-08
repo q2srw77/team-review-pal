@@ -243,6 +243,14 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
               Active ({activeRequests.length})
             </Button>
             <Button
+              variant={view === "correction" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-md"
+              onClick={() => setView("correction")}
+            >
+              Correction ({correctionRequests.length})
+            </Button>
+            <Button
               variant={view === "completed" ? "default" : "ghost"}
               size="sm"
               className="rounded-md"
