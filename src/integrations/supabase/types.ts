@@ -228,7 +228,6 @@ export type Database = {
           full_name: string
           id: string
           password_disabled: boolean
-          theme_preference: string
           updated_at: string
           user_id: string
         }
@@ -238,7 +237,6 @@ export type Database = {
           full_name?: string
           id?: string
           password_disabled?: boolean
-          theme_preference?: string
           updated_at?: string
           user_id: string
         }
@@ -248,7 +246,6 @@ export type Database = {
           full_name?: string
           id?: string
           password_disabled?: boolean
-          theme_preference?: string
           updated_at?: string
           user_id?: string
         }
@@ -533,6 +530,30 @@ export type Database = {
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          id: string
+          theme_preference: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          theme_preference?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          theme_preference?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
