@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { useTheme } from "@/hooks/useTheme";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Settings from "@/pages/Settings";
@@ -9,6 +10,7 @@ import SetupForm from "@/components/SetupForm";
 
 export default function Index() {
   const { user, loading, isAdmin } = useAuth();
+  const { themeReady } = useTheme();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [page, setPage] = useState<"dashboard" | "settings" | "profile">("dashboard");
 
@@ -26,7 +28,7 @@ export default function Index() {
     }
   }, [loading, user]);
 
-  if (loading || (!user && needsSetup === null)) {
+  if (loading || !themeReady || (!user && needsSetup === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />

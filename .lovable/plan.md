@@ -1,35 +1,53 @@
-## Plan: Admin-Configurable Default Theme
+## Goal
+Eliminate the visible light/dark "flash" that happens on initial page load and right after login, by resolving the correct theme **before** the app paints.
 
-### Goal
-Add a "Theme" section in Settings where admins can set the **default theme** (light/dark) for the Review Hub app and Login screen. Authenticated users can still override it with their own preference, which continues to persist in `user_settings`.
+## Current problems
 
-### Steps
+1. `getInitialTheme()` only checks `localStorage["theme-preference"]` and system preference — it never knows about the admin's app default until an async Supabase call resolves, so anonymous visitors briefly see the wrong theme.
+2. On login, `user_settings.theme_preference` is fetched async after `AuthProvider` resolves the user. Until that query returns, the app shows whatever the anonymous theme was → flash.
+3. `localStorage["theme-preference"]` is overwritten on every `theme` change (including the transient anonymous default), so a returning user can briefly see the previous session's theme before their own preference loads.
+4. There is no inline pre-paint script in `index.html`, so even the cached value isn't applied until React mounts.
 
-1. **Database — new `app_settings` table**
-   - Single-row keyed table for app-wide configuration:
-     - `key text primary key`, `value jsonb`, `updated_at`, `updated_by`
-   - Seed row: `('default_theme', '"light"')`
-   - RLS:
-     - SELECT: `true` (anonymous + authenticated) — needed so the Login screen can read the default before sign-in
-     - INSERT/UPDATE: admins only (`has_role(auth.uid(), 'admin')`)
+## Plan
 
-2. **Frontend — `useTheme` hook update**
-   - On mount (no user yet): fetch `default_theme` from `app_settings` and apply if no `localStorage` override exists.
-   - On user login: if `user_settings.theme_preference` exists, it wins; otherwise fall back to the app default.
-   - Toggling theme still upserts the user's personal preference (existing behavior).
-   - Resolution order: user setting → localStorage → app default → system preference.
+### 1. Pre-paint inline script in `index.html`
+Add a small blocking `<script>` in `<head>` that runs before React:
+- Read `localStorage["theme-user-override"]` + `localStorage["theme-preference"]` (per-user saved value, keyed by user id when available — see step 3).
+- Else read `localStorage["app-default-theme"]` (cached admin default).
+- Else fall back to `prefers-color-scheme`.
+- Toggle `document.documentElement.classList` and set a `data-theme` attribute synchronously.
 
-3. **Frontend — Settings: new "Theme" section (admin only)**
-   - Add `Theme` nav item in `src/pages/Settings.tsx` (icon: `Palette` or `SunMoon`).
-   - New component `src/components/settings/ThemeSettings.tsx`:
-     - Radio/Select for "Default theme": Light / Dark
-     - Save button → updates `app_settings` row for `default_theme`
-     - Small note: "Users can override this in their own profile."
-   - Gated by `isAdmin` from `useAuth`.
+This guarantees the first painted frame already has the right class.
 
-4. **Login screen**
-   - No changes required: `ThemeProvider` wraps the app in `App.tsx`, so the default fetched in step 2 is applied before login.
+### 2. Cache the admin default theme locally
+- In `useTheme`, when the `app_settings.default_theme` query resolves, write the value to `localStorage["app-default-theme"]`.
+- The pre-paint script in step 1 reads this on subsequent visits, so anonymous users only see a flash on their very first visit.
 
-### Out of scope
-- No change to per-user override behavior or the existing dark-mode toggle in the Dashboard header.
-- No audit log entry for theme change (can be added later if needed).
+### 3. Per-user cached preference keyed by user id
+- Replace single `theme-preference` key with `theme-preference:<userId>` (and keep an `anon` bucket for logged-out state).
+- After login, the inline script can't know the user yet, but `useTheme` will: as soon as `useAuth` exposes `user.id`, read `theme-preference:<userId>` from localStorage **synchronously** and apply it before the Supabase round-trip. The Supabase fetch then reconciles/updates the cache.
+- This removes the post-login flash for returning users.
+
+### 4. Gate first paint until theme is resolved (only when needed)
+- In `Index.tsx`, the existing loading spinner already covers `loading`. Extend `useTheme` to expose a `themeReady` boolean that becomes true when:
+  - anonymous: app default + localStorage have been considered (synchronous after step 1, so effectively immediate), OR
+  - authenticated: cached per-user theme exists OR Supabase fetch completed.
+- `Index.tsx` keeps showing the spinner (with `bg-background` already themed) until both `auth.loading` is false AND `themeReady` is true. This eliminates flash for first-time logins where no cache exists yet.
+
+### 5. Stop overwriting saved preference with transient values
+- Only write to `theme-preference:<userId>` (or `theme-preference:anon`) inside `toggleTheme` and after a successful Supabase load — never on every `setTheme` triggered by the default-theme effect.
+- Remove the blanket `localStorage.setItem(STORAGE_KEY, theme)` in the `[theme]` effect.
+
+### 6. Clean up on sign-out
+- On `signOut`, clear `USER_OVERRIDE_KEY` so the app default reapplies for the next anonymous visitor on this device.
+
+## Files to change
+
+- `index.html` — add inline pre-paint theme script (step 1).
+- `src/hooks/useTheme.tsx` — synchronous per-user cache read, cache app default, expose `themeReady`, fix overwrite bug, sign-out cleanup (steps 2–6).
+- `src/pages/Index.tsx` — wait for `themeReady` alongside `loading` before rendering the first real screen (step 4).
+
+## Out of scope
+- No DB schema changes.
+- No changes to the admin Theme settings UI or per-user toggle behavior beyond the storage key rename.
+- No changes to the Login screen layout.
