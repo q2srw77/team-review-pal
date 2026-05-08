@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
       y += 6
     }
 
-    // Reviewer Comments
+    // Reviewer Comments — grouped by round, with decisions
     y += 8
     checkPage(12)
     doc.setFontSize(12)
@@ -250,44 +250,97 @@ Deno.serve(async (req) => {
     doc.text('Reviewer Comments', margin, y)
     y += 8
 
+    // Summary stats
+    const totalNotes = notes.length
+    const acceptedCount = notes.filter((n: any) => n.decision === 'accepted').length
+    const rejectedCount = notes.filter((n: any) => n.decision === 'rejected').length
+    const roundNumbers = [...new Set(notes.map((n: any) => n.round_number ?? 1))].sort((a, b) => a - b)
+    const roundCount = roundNumbers.length || (request.current_round ?? 1)
+
     doc.setFontSize(10)
-    if (notes && notes.length > 0) {
-      for (const note of notes) {
-        checkPage(22)
-        const authorName = noteAuthorNames.get(note.author_id) ?? 'Unknown'
-        const date = new Date(note.created_at).toLocaleString('en-US', {
-          month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-        })
+    doc.setFont('helvetica', 'normal')
+    checkPage(6)
+    doc.text(`Total: ${totalNotes}    Accepted: ${acceptedCount}    Rejected: ${rejectedCount}    Rounds: ${roundCount}`, margin + 4, y)
+    y += 8
 
-        // Render position badge (Slide/Step/Page) when applicable
-        if (positionLabel !== 'None' && note.position_number != null) {
-          const badgeText = `${positionLabel.toUpperCase()} ${note.position_number}`
-          doc.setFont('helvetica', 'bold')
-          doc.setFontSize(9)
-          const textW = doc.getTextWidth(badgeText)
-          const padX = 2.5
-          const badgeW = textW + padX * 2
-          const badgeH = 5
-          doc.setFillColor(32, 6, 247)
-          doc.roundedRect(margin + 4, y - 4, badgeW, badgeH, 1.2, 1.2, 'F')
-          doc.setTextColor(255, 255, 255)
-          doc.text(badgeText, margin + 4 + padX, y - 0.3)
-          // reset
-          doc.setTextColor(0, 0, 0)
-          doc.setFontSize(10)
-          y += 4
-        }
-
+    if (totalNotes > 0) {
+      for (const round of roundNumbers) {
+        checkPage(10)
         doc.setFont('helvetica', 'bold')
-        doc.text(`${authorName} — ${date}`, margin + 4, y)
-        y += 5
+        doc.setFontSize(11)
+        doc.text(`Round ${round}`, margin, y)
+        y += 6
+        doc.setFontSize(10)
 
-        doc.setFont('helvetica', 'normal')
-        const commentLines = doc.splitTextToSize(note.content, contentWidth - 8)
-        for (const line of commentLines) {
-          checkPage(6)
-          doc.text(line, margin + 4, y)
+        const roundNotes = sortNotes(notes.filter((n: any) => (n.round_number ?? 1) === round))
+
+        for (const note of roundNotes) {
+          checkPage(22)
+          const authorName = noteAuthorNames.get(note.author_id) ?? 'Unknown'
+          const date = new Date(note.created_at).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+          })
+
+          // Position badge
+          if (positionLabel !== 'None' && note.position_number != null) {
+            const badgeText = `${positionLabel.toUpperCase()} ${note.position_number}`
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(9)
+            const textW = doc.getTextWidth(badgeText)
+            const padX = 2.5
+            const badgeW = textW + padX * 2
+            const badgeH = 5
+            doc.setFillColor(32, 6, 247)
+            doc.roundedRect(margin + 4, y - 4, badgeW, badgeH, 1.2, 1.2, 'F')
+            doc.setTextColor(255, 255, 255)
+            doc.text(badgeText, margin + 4 + padX, y - 0.3)
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(10)
+            y += 4
+          }
+
+          // Decision badge
+          const decision = (note.decision ?? 'pending') as string
+          if (decision !== 'pending') {
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(9)
+            const dText = decision.toUpperCase()
+            const dW = doc.getTextWidth(dText)
+            const padX = 2.5
+            const badgeW = dW + padX * 2
+            if (decision === 'accepted') doc.setFillColor(22, 163, 74)
+            else doc.setFillColor(220, 38, 38)
+            doc.roundedRect(pageWidth - margin - badgeW - 4, y - 4, badgeW, 5, 1.2, 1.2, 'F')
+            doc.setTextColor(255, 255, 255)
+            doc.text(dText, pageWidth - margin - badgeW - 4 + padX, y - 0.3)
+            doc.setTextColor(0, 0, 0)
+            doc.setFontSize(10)
+          }
+
+          doc.setFont('helvetica', 'bold')
+          doc.text(`${authorName} — ${date}`, margin + 4, y)
           y += 5
+
+          doc.setFont('helvetica', 'normal')
+          const commentLines = doc.splitTextToSize(note.content, contentWidth - 8)
+          for (const line of commentLines) {
+            checkPage(6)
+            doc.text(line, margin + 4, y)
+            y += 5
+          }
+
+          if (decision === 'rejected' && note.rejection_comment) {
+            checkPage(6)
+            doc.setFont('helvetica', 'italic')
+            const rejLines = doc.splitTextToSize(`Submitter response: ${note.rejection_comment}`, contentWidth - 8)
+            for (const line of rejLines) {
+              checkPage(6)
+              doc.text(line, margin + 8, y)
+              y += 5
+            }
+            doc.setFont('helvetica', 'normal')
+          }
+          y += 4
         }
         y += 4
       }
