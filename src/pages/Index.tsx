@@ -10,6 +10,7 @@ import SetupForm from "@/components/SetupForm";
 
 export default function Index() {
   const { user, loading, isAdmin } = useAuth();
+  const { themeReady } = useTheme();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [page, setPage] = useState<"dashboard" | "settings" | "profile">("dashboard");
 
