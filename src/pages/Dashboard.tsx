@@ -36,7 +36,7 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
   const { theme, toggleTheme } = useTheme();
   const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
-  const [view, setView] = useState<"active" | "completed">("active");
+  const [view, setView] = useState<"active" | "correction" | "completed">("active");
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
