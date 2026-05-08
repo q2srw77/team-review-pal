@@ -503,7 +503,9 @@ export default function RequestDetail({
       fetchReviewerStatuses();
       onUpdated();
 
-      // Check if all reviewers are now completed and send instant notification
+      // When all reviewers complete, the DB trigger lands the request in 'correction'.
+      // Notify the submitter that all reviewers have finished — final PDF is generated
+      // later when the submitter clicks Complete.
       if (newStatus === "completed") {
         const { data: allStatuses } = await supabase
           .from("review_statuses")
@@ -513,7 +515,6 @@ export default function RequestDetail({
         const allComplete = allStatuses && allStatuses.length > 0 && allStatuses.every((s) => s.status === "completed");
 
         if (allComplete) {
-          // Fetch submitter email and team name for the notification
           const [{ data: submitterProfile }, { data: team }] = await Promise.all([
             supabase.from("profiles").select("email").eq("user_id", request.submitted_by).single(),
             request.team_id
@@ -535,11 +536,6 @@ export default function RequestDetail({
               },
             });
           }
-
-          // Trigger PDF report generation
-          await supabase.functions.invoke("generate-review-report", {
-            body: { request_id: request.id },
-          });
         }
       }
     }
