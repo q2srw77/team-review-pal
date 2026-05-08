@@ -38,7 +38,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     supabase
-      .from("profiles")
+      .from("user_settings")
       .select("theme_preference")
       .eq("user_id", user.id)
       .maybeSingle()
@@ -53,9 +53,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const next: Theme = prev === "dark" ? "light" : "dark";
       if (user) {
         supabase
-          .from("profiles")
-          .update({ theme_preference: next })
-          .eq("user_id", user.id)
+          .from("user_settings")
+          .upsert({ user_id: user.id, theme_preference: next }, { onConflict: "user_id" })
           .then(() => {});
       }
       return next;
