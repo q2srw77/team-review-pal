@@ -473,10 +473,12 @@ export default function RequestDetail({
 
   const updateMyReviewStatus = async (newStatus: string) => {
     if (!request || !user) return;
-    if (request.status === "completed") {
+    if (request.status === "completed" || request.status === "correction") {
       toast({
         title: "Review locked",
-        description: "This review is closed and can no longer be updated.",
+        description: request.status === "correction"
+          ? "This review is in Correction. The submitter is reviewing comments."
+          : "This review is closed and can no longer be updated.",
         variant: "destructive",
       });
       return;
