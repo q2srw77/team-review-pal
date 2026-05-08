@@ -240,7 +240,7 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
               className="rounded-md"
               onClick={() => setView("active")}
             >
-              Active ({activeRequests.length})
+              Review ({activeRequests.length})
             </Button>
             <Button
               variant={view === "correction" ? "default" : "ghost"}
