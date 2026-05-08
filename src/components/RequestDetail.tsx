@@ -731,6 +731,21 @@ export default function RequestDetail({
             </div>
           )}
 
+          {/* Correction banner */}
+          {inCorrection && (
+            <div className="rounded-md border border-[hsl(var(--status-correction)/0.4)] bg-[hsl(var(--status-correction)/0.1)] p-3 text-sm">
+              {isSubmitter ? (
+                <p className="text-[hsl(var(--status-correction))]">
+                  <strong>Correction needed.</strong> All reviewers have submitted comments. Please accept or reject each comment below, then either re-submit for another round or complete the review.
+                </p>
+              ) : (
+                <p className="text-[hsl(var(--status-correction))]">
+                  <strong>This review is in Correction.</strong> The submitter is reviewing comments and will either re-submit or complete the request.
+                </p>
+              )}
+            </div>
+          )}
+
           <Separator />
 
           {/* Reviewer Progress */}
