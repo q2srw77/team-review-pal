@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, Loader2, Download, Pencil, X, Save, Trash2, Lock, Maximize2, Minimize2 } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, XCircle, Loader2, Download, Pencil, X, Save, Trash2, Lock, Maximize2, Minimize2, RotateCcw, Check, ChevronDown, ChevronRight } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +39,12 @@ interface Note {
   author_id: string;
   author_name: string;
   position_number: number | null;
+  decision: "pending" | "accepted" | "rejected";
+  rejection_comment: string | null;
+  decided_at: string | null;
+  decided_by: string | null;
+  round_number: number;
+  archived: boolean;
 }
 
 interface ReviewerStatus {
@@ -51,12 +57,14 @@ interface ReviewerStatus {
 const STATUS_STYLES: Record<RequestStatus, string> = {
   pending: "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.3)]",
   in_review: "bg-[hsl(var(--status-in-review)/0.15)] text-[hsl(var(--status-in-review))] border-[hsl(var(--status-in-review)/0.3)]",
+  correction: "bg-[hsl(var(--status-correction)/0.15)] text-[hsl(var(--status-correction))] border-[hsl(var(--status-correction)/0.3)]",
   completed: "bg-[hsl(var(--status-completed)/0.15)] text-[hsl(var(--status-completed))] border-[hsl(var(--status-completed)/0.3)]",
 };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   pending: "Pending",
   in_review: "In Review",
+  correction: "Correction",
   completed: "Completed",
 };
 
@@ -130,8 +138,106 @@ export default function RequestDetail({
     setPositionLabel(((data as { position_label?: PositionLabel } | null)?.position_label ?? "None") as PositionLabel);
   };
 
-  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
+  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed" && request?.status !== "correction";
   const canArchiveDelete = user?.id === request?.submitted_by || isAdmin;
+  const isSubmitter = user?.id === request?.submitted_by;
+  const inCorrection = request?.status === "correction";
+  const isLocked = request?.status === "completed" || request?.status === "correction";
+
+  // Reject dialog state
+  const [rejectingNoteId, setRejectingNoteId] = useState<string | null>(null);
+  const [rejectComment, setRejectComment] = useState("");
+  const [savingDecision, setSavingDecision] = useState<string | null>(null);
+
+  // Round history state
+  const [showPreviousRounds, setShowPreviousRounds] = useState(false);
+  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
+
+  // Action button state
+  const [resubmitting, setResubmitting] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+
+  const setDecision = async (
+    noteId: string,
+    decision: "accepted" | "rejected",
+    comment?: string,
+  ) => {
+    if (!request || !user) return;
+    setSavingDecision(noteId);
+    const { error } = await supabase
+      .from("request_notes")
+      .update({
+        decision,
+        rejection_comment: decision === "rejected" ? (comment ?? "") : null,
+        decided_at: new Date().toISOString(),
+        decided_by: user.id,
+      })
+      .eq("id", noteId);
+    setSavingDecision(null);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    supabase.functions.invoke("write-audit-log", {
+      body: {
+        action: "correction_decision_made",
+        entity_type: "review_request",
+        entity_id: request.id,
+        details: { note_id: noteId, decision, has_rejection_comment: decision === "rejected" && !!(comment && comment.trim()) },
+      },
+    }).catch(() => {});
+    fetchNotes();
+  };
+
+  const handleAccept = (noteId: string) => setDecision(noteId, "accepted");
+
+  const openReject = (note: Note) => {
+    setRejectingNoteId(note.id);
+    setRejectComment(note.rejection_comment ?? "");
+  };
+
+  const confirmReject = async () => {
+    if (!rejectingNoteId || !rejectComment.trim()) return;
+    const id = rejectingNoteId;
+    const comment = rejectComment.trim();
+    setRejectingNoteId(null);
+    setRejectComment("");
+    await setDecision(id, "rejected", comment);
+  };
+
+  const resubmitForReview = async () => {
+    if (!request) return;
+    setResubmitting(true);
+    const { data, error } = await supabase.functions.invoke("resubmit-for-review", {
+      body: { request_id: request.id },
+    });
+    setResubmitting(false);
+    setShowResubmitConfirm(false);
+    if (error) {
+      toast({ title: "Error", description: (data as any)?.error ?? error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Re-submitted", description: "Reviewers have been notified for the new round." });
+    onUpdated();
+  };
+
+  const finalizeRequest = async () => {
+    if (!request) return;
+    setFinalizing(true);
+    const { data, error } = await supabase.functions.invoke("finalize-review-request", {
+      body: { request_id: request.id },
+    });
+    setFinalizing(false);
+    setShowFinalizeConfirm(false);
+    if (error) {
+      toast({ title: "Error", description: (data as any)?.error ?? error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Completed", description: "The request is locked and a report has been emailed to you." });
+    onUpdated();
+  };
 
   const enterEditMode = async () => {
     if (!request) return;
@@ -268,7 +374,7 @@ export default function RequestDetail({
     if (!request) return;
     const { data } = await supabase
       .from("request_notes")
-      .select("id, content, created_at, author_id, position_number")
+      .select("id, content, created_at, author_id, position_number, decision, rejection_comment, decided_at, decided_by, round_number, archived")
       .eq("request_id", request.id)
       .order("created_at", { ascending: true });
 
@@ -283,13 +389,19 @@ export default function RequestDetail({
     const nameMap = new Map(profiles?.map((p) => [p.user_id, p.full_name]) ?? []);
 
     setNotes(
-      data.map((n: { id: string; content: string; created_at: string; author_id: string; position_number: number | null }) => ({
+      data.map((n: any) => ({
         id: n.id,
         content: n.content,
         created_at: n.created_at,
         author_id: n.author_id,
         author_name: nameMap.get(n.author_id) ?? "Unknown",
         position_number: n.position_number,
+        decision: (n.decision ?? "pending") as Note["decision"],
+        rejection_comment: n.rejection_comment ?? null,
+        decided_at: n.decided_at ?? null,
+        decided_by: n.decided_by ?? null,
+        round_number: n.round_number ?? 1,
+        archived: !!n.archived,
       }))
     );
   };
@@ -361,10 +473,12 @@ export default function RequestDetail({
 
   const updateMyReviewStatus = async (newStatus: string) => {
     if (!request || !user) return;
-    if (request.status === "completed") {
+    if (request.status === "completed" || request.status === "correction") {
       toast({
         title: "Review locked",
-        description: "This review is closed and can no longer be updated.",
+        description: request.status === "correction"
+          ? "This review is in Correction. The submitter is reviewing comments."
+          : "This review is closed and can no longer be updated.",
         variant: "destructive",
       });
       return;
@@ -389,7 +503,9 @@ export default function RequestDetail({
       fetchReviewerStatuses();
       onUpdated();
 
-      // Check if all reviewers are now completed and send instant notification
+      // When all reviewers complete, the DB trigger lands the request in 'correction'.
+      // Notify the submitter that all reviewers have finished — final PDF is generated
+      // later when the submitter clicks Complete.
       if (newStatus === "completed") {
         const { data: allStatuses } = await supabase
           .from("review_statuses")
@@ -399,7 +515,6 @@ export default function RequestDetail({
         const allComplete = allStatuses && allStatuses.length > 0 && allStatuses.every((s) => s.status === "completed");
 
         if (allComplete) {
-          // Fetch submitter email and team name for the notification
           const [{ data: submitterProfile }, { data: team }] = await Promise.all([
             supabase.from("profiles").select("email").eq("user_id", request.submitted_by).single(),
             request.team_id
@@ -421,11 +536,6 @@ export default function RequestDetail({
               },
             });
           }
-
-          // Trigger PDF report generation
-          await supabase.functions.invoke("generate-review-report", {
-            body: { request_id: request.id },
-          });
         }
       }
     }
@@ -675,7 +785,7 @@ export default function RequestDetail({
                           </span>
                         )}
                       </div>
-                      {isMe && isReviewer && request.status !== "completed" ? (
+                      {isMe && isReviewer && !isLocked ? (
                         <Select value={rs.status} onValueChange={updateMyReviewStatus}>
                           <SelectTrigger className="h-7 w-32 text-xs">
                             <SelectValue />
@@ -733,7 +843,7 @@ export default function RequestDetail({
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
-                      {user?.id === note.author_id && request.status !== "completed" && editingNoteId !== note.id && (
+                      {user?.id === note.author_id && !isLocked && editingNoteId !== note.id && (
                         <Button
                           size="icon"
                           variant="ghost"
@@ -789,7 +899,7 @@ export default function RequestDetail({
               ))}
             </div>
 
-            {isReviewer && request.status !== "completed" && (
+            {isReviewer && !isLocked && (
               <div className="mt-4 space-y-2">
                 {positionLabel !== "None" && (
                   <div className="flex items-center gap-2">

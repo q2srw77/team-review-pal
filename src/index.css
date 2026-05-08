@@ -40,6 +40,7 @@ All colors MUST be HSL.
 
     --status-pending: 38 92% 50%;
     --status-in-review: 215 80% 48%;
+    --status-correction: 25 95% 53%;
     --status-completed: 152 60% 42%;
 
     --sidebar-background: 0 0% 98%;
@@ -90,6 +91,7 @@ All colors MUST be HSL.
 
     --status-pending: 38 92% 58%;
     --status-in-review: 215 80% 62%;
+    --status-correction: 25 95% 60%;
     --status-completed: 152 60% 50%;
 
     --sidebar-background: 220 25% 10%;

@@ -20,12 +20,14 @@ type RequestStatus = Database["public"]["Enums"]["request_status"];
 const STATUS_STYLES: Record<RequestStatus, string> = {
   pending: "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.3)]",
   in_review: "bg-[hsl(var(--status-in-review)/0.15)] text-[hsl(var(--status-in-review))] border-[hsl(var(--status-in-review)/0.3)]",
+  correction: "bg-[hsl(var(--status-correction)/0.15)] text-[hsl(var(--status-correction))] border-[hsl(var(--status-correction)/0.3)]",
   completed: "bg-[hsl(var(--status-completed)/0.15)] text-[hsl(var(--status-completed))] border-[hsl(var(--status-completed)/0.3)]",
 };
 
 const STATUS_LABELS: Record<RequestStatus, string> = {
   pending: "Pending",
   in_review: "In Review",
+  correction: "Correction",
   completed: "Completed",
 };
 
@@ -34,7 +36,7 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
   const { theme, toggleTheme } = useTheme();
   const [allRequests, setAllRequests] = useState<ReviewRequest[]>([]);
   const [selected, setSelected] = useState<ReviewRequest | null>(null);
-  const [view, setView] = useState<"active" | "completed">("active");
+  const [view, setView] = useState<"active" | "correction" | "completed">("active");
   const [detailOpen, setDetailOpen] = useState(false);
   const [teamMap, setTeamMap] = useState<Map<string, string>>(new Map());
   const [userTeamIds, setUserTeamIds] = useState<string[]>([]);
@@ -137,8 +139,9 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
   useEffect(() => { setStatusFilter("all"); }, [view]);
 
   const activeRequests = allRequests.filter((r) => r.status === "pending" || r.status === "in_review");
+  const correctionRequests = allRequests.filter((r) => r.status === "correction");
   const completedRequests = allRequests.filter((r) => r.status === "completed");
-  const baseRequests = view === "active" ? activeRequests : completedRequests;
+  const baseRequests = view === "active" ? activeRequests : view === "correction" ? correctionRequests : completedRequests;
 
   const platformOptions = useMemo(() => {
     const set = new Set<string>();
@@ -238,6 +241,14 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
               onClick={() => setView("active")}
             >
               Active ({activeRequests.length})
+            </Button>
+            <Button
+              variant={view === "correction" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-md"
+              onClick={() => setView("correction")}
+            >
+              Correction ({correctionRequests.length})
             </Button>
             <Button
               variant={view === "completed" ? "default" : "ghost"}
