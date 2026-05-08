@@ -832,87 +832,196 @@ export default function RequestDetail({
 
           {/* Reviewer notes */}
           <div>
-            <h3 className="font-semibold text-sm mb-3">Reviewer Notes</h3>
-            {notes.length === 0 && (
-              <p className="text-sm text-muted-foreground italic">No reviewer notes yet.</p>
-            )}
-            <div className="space-y-3">
-              {[...notes]
-                .sort((a, b) => {
-                  if (positionLabel === "None") return a.created_at.localeCompare(b.created_at);
-                  const ax = a.position_number ?? Number.MAX_SAFE_INTEGER;
-                  const bx = b.position_number ?? Number.MAX_SAFE_INTEGER;
-                  if (ax !== bx) return ax - bx;
-                  return a.created_at.localeCompare(b.created_at);
-                })
-                .map((note) => (
-                <div key={note.id} className="bg-secondary/40 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1 gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {positionLabel !== "None" && note.position_number != null && editingNoteId !== note.id && (
-                        <Badge className="text-[10px] uppercase tracking-wide shrink-0 font-bold text-white border-transparent hover:opacity-90" style={{ backgroundColor: "#2006F7" }}>
-                          {positionLabel} {note.position_number}
-                        </Badge>
-                      )}
-                      <span className="font-medium text-sm text-foreground truncate">{note.author_name}</span>
+            <h3 className="font-semibold text-sm mb-3">Reviewer Notes{request.current_round > 1 ? ` — Round ${request.current_round}` : ""}</h3>
+            {(() => {
+              const sortFn = (a: Note, b: Note) => {
+                if (positionLabel === "None") return a.created_at.localeCompare(b.created_at);
+                const ax = a.position_number ?? Number.MAX_SAFE_INTEGER;
+                const bx = b.position_number ?? Number.MAX_SAFE_INTEGER;
+                if (ax !== bx) return ax - bx;
+                return a.created_at.localeCompare(b.created_at);
+              };
+              const currentNotes = notes.filter((n) => !n.archived).sort(sortFn);
+              const archivedNotes = notes.filter((n) => n.archived);
+              const archivedRounds = [...new Set(archivedNotes.map((n) => n.round_number))].sort((a, b) => a - b);
+
+              const decisionsTotal = currentNotes.length;
+              const acceptedTotal = currentNotes.filter((n) => n.decision === "accepted").length;
+              const rejectedTotal = currentNotes.filter((n) => n.decision === "rejected").length;
+              const pendingTotal = decisionsTotal - acceptedTotal - rejectedTotal;
+              const reviewedTotal = acceptedTotal + rejectedTotal;
+
+              const renderNote = (note: Note, opts: { readOnly: boolean }) => {
+                const decisionIcon = note.decision === "accepted"
+                  ? <CheckCircle2 className="w-4 h-4 text-[hsl(var(--status-completed))]" />
+                  : note.decision === "rejected"
+                  ? <XCircle className="w-4 h-4 text-destructive" />
+                  : <Circle className="w-4 h-4 text-muted-foreground" />;
+                return (
+                  <div key={note.id} className="bg-secondary/40 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-1 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {(inCorrection || request.status === "completed") && decisionIcon}
+                        {positionLabel !== "None" && note.position_number != null && editingNoteId !== note.id && (
+                          <Badge className="text-[10px] uppercase tracking-wide shrink-0 font-bold text-white border-transparent hover:opacity-90" style={{ backgroundColor: "#2006F7" }}>
+                            {positionLabel} {note.position_number}
+                          </Badge>
+                        )}
+                        <span className="font-medium text-sm text-foreground truncate">{note.author_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
+                        {!opts.readOnly && user?.id === note.author_id && !isLocked && editingNoteId !== note.id && (
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => startEditNote(note)} aria-label="Edit note">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
-                      {user?.id === note.author_id && !isLocked && editingNoteId !== note.id && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6"
-                          onClick={() => startEditNote(note)}
-                          aria-label="Edit note"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  {editingNoteId === note.id ? (
-                    <div className="space-y-2">
-                      {positionLabel !== "None" && (
+                    {editingNoteId === note.id && !opts.readOnly ? (
+                      <div className="space-y-2">
+                        {positionLabel !== "None" && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">{positionLabel} #</span>
+                            <Input
+                              value={editNotePosition}
+                              onChange={(e) => setEditNotePosition(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                              inputMode="numeric" maxLength={3} placeholder="1-999" className="h-8 w-24"
+                            />
+                          </div>
+                        )}
+                        <Textarea value={editNoteContent} onChange={(e) => setEditNoteContent(e.target.value)} rows={2} maxLength={2000} />
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-muted-foreground">{positionLabel} #</span>
-                          <Input
-                            value={editNotePosition}
-                            onChange={(e) => setEditNotePosition(e.target.value.replace(/\D/g, "").slice(0, 3))}
-                            inputMode="numeric"
-                            maxLength={3}
-                            placeholder="1-999"
-                            className="h-8 w-24"
-                          />
+                          <Button size="sm" onClick={() => saveEditNote(note.id)} disabled={savingNote || !editNoteContent.trim() || (positionLabel !== "None" && !editNotePosition)}>
+                            <Save className="w-3.5 h-3.5 mr-1.5" />{savingNote ? "Saving…" : "Save"}
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={cancelEditNote} disabled={savingNote}>
+                            <X className="w-3.5 h-3.5 mr-1.5" />Cancel
+                          </Button>
                         </div>
-                      )}
-                      <Textarea
-                        value={editNoteContent}
-                        onChange={(e) => setEditNoteContent(e.target.value)}
-                        rows={2}
-                        maxLength={2000}
-                      />
-                      <div className="flex items-center gap-2">
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                        {note.decision === "rejected" && note.rejection_comment && (
+                          <p className="mt-2 text-xs italic text-muted-foreground border-l-2 border-destructive/50 pl-2">
+                            <strong>Submitter response:</strong> {note.rejection_comment}
+                          </p>
+                        )}
+                        {inCorrection && isSubmitter && !opts.readOnly && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant={note.decision === "accepted" ? "default" : "outline"}
+                              onClick={() => handleAccept(note.id)}
+                              disabled={savingDecision === note.id}
+                              className="h-7"
+                            >
+                              <Check className="w-3.5 h-3.5 mr-1" /> Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={note.decision === "rejected" ? "destructive" : "outline"}
+                              onClick={() => openReject(note)}
+                              disabled={savingDecision === note.id}
+                              className="h-7"
+                            >
+                              <X className="w-3.5 h-3.5 mr-1" /> Reject
+                            </Button>
+                          </div>
+                        )}
+                        {inCorrection && !isSubmitter && (
+                          <p className="mt-2 text-xs text-muted-foreground italic">Awaiting submitter review</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              };
+
+              return (
+                <>
+                  {currentNotes.length === 0 && (
+                    <p className="text-sm text-muted-foreground italic">No reviewer notes yet.</p>
+                  )}
+                  <div className="space-y-3">
+                    {currentNotes.map((n) => renderNote(n, { readOnly: false }))}
+                  </div>
+
+                  {inCorrection && isSubmitter && currentNotes.length > 0 && (
+                    <div className="mt-4 rounded-lg border bg-card p-3 space-y-3">
+                      <div className="text-xs text-muted-foreground">
+                        {reviewedTotal} of {decisionsTotal} comments reviewed ({acceptedTotal} accepted, {rejectedTotal} rejected)
+                        {pendingTotal > 0 && <span className="ml-1">· {pendingTotal} pending</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={resubmitting || rejectedTotal === 0}
+                          onClick={() => setShowResubmitConfirm(true)}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                          {resubmitting ? "Re-submitting…" : "Re-Submit for Review"}
+                        </Button>
                         <Button
                           size="sm"
-                          onClick={() => saveEditNote(note.id)}
-                          disabled={savingNote || !editNoteContent.trim() || (positionLabel !== "None" && !editNotePosition)}
+                          disabled={finalizing || pendingTotal > 0}
+                          onClick={() => setShowFinalizeConfirm(true)}
                         >
-                          <Save className="w-3.5 h-3.5 mr-1.5" />
-                          {savingNote ? "Saving…" : "Save"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={cancelEditNote} disabled={savingNote}>
-                          <X className="w-3.5 h-3.5 mr-1.5" />
-                          Cancel
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                          {finalizing ? "Finalizing…" : "Complete"}
                         </Button>
                       </div>
                     </div>
-                  ) : (
-                    <p className="text-sm whitespace-pre-wrap">{note.content}</p>
                   )}
-                </div>
-              ))}
-            </div>
+
+                  {archivedRounds.length > 0 && (
+                    <div className="mt-6">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowPreviousRounds((v) => !v)}
+                      >
+                        {showPreviousRounds ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        Previous Rounds ({archivedRounds.length})
+                      </button>
+                      {showPreviousRounds && (
+                        <div className="mt-3 space-y-3">
+                          {archivedRounds.map((roundNum) => {
+                            const roundNotes = archivedNotes.filter((n) => n.round_number === roundNum).sort(sortFn);
+                            const isOpen = expandedRounds.has(roundNum);
+                            return (
+                              <div key={roundNum} className="border rounded-lg">
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center justify-between p-2 text-sm font-medium hover:bg-secondary/40"
+                                  onClick={() => setExpandedRounds((s) => {
+                                    const ns = new Set(s);
+                                    if (ns.has(roundNum)) ns.delete(roundNum); else ns.add(roundNum);
+                                    return ns;
+                                  })}
+                                >
+                                  <span className="flex items-center gap-1">
+                                    {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                    Round {roundNum} ({roundNotes.length} comment{roundNotes.length === 1 ? "" : "s"})
+                                  </span>
+                                </button>
+                                {isOpen && (
+                                  <div className="p-2 space-y-2 border-t">
+                                    {roundNotes.map((n) => renderNote(n, { readOnly: true }))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             {isReviewer && !isLocked && (
               <div className="mt-4 space-y-2">
@@ -922,10 +1031,7 @@ export default function RequestDetail({
                     <Input
                       value={newNotePosition}
                       onChange={(e) => setNewNotePosition(e.target.value.replace(/\D/g, "").slice(0, 3))}
-                      inputMode="numeric"
-                      maxLength={3}
-                      placeholder="1-999"
-                      className="h-8 w-24"
+                      inputMode="numeric" maxLength={3} placeholder="1-999" className="h-8 w-24"
                     />
                   </div>
                 )}
@@ -947,6 +1053,71 @@ export default function RequestDetail({
               </div>
             )}
           </div>
+
+          {/* Reject dialog */}
+          <AlertDialog open={!!rejectingNoteId} onOpenChange={(v) => { if (!v) { setRejectingNoteId(null); setRejectComment(""); } }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Reject this comment</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Please explain why you're rejecting this comment. The reviewer will see your response.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Textarea
+                value={rejectComment}
+                onChange={(e) => setRejectComment(e.target.value)}
+                placeholder="Reason for rejecting…"
+                rows={4}
+                maxLength={1000}
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={!rejectComment.trim()}
+                  onClick={(e) => { e.preventDefault(); confirmReject(); }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Reject
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Re-submit confirm */}
+          <AlertDialog open={showResubmitConfirm} onOpenChange={setShowResubmitConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Re-submit for review?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The current round of comments will be archived, reviewer statuses will be reset, and reviewers will be emailed to start a new round.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={resubmitting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={(e) => { e.preventDefault(); resubmitForReview(); }} disabled={resubmitting}>
+                  {resubmitting ? "Re-submitting…" : "Re-Submit"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Finalize confirm */}
+          <AlertDialog open={showFinalizeConfirm} onOpenChange={setShowFinalizeConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Complete this review?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The request will be locked, a final report will be generated, and a download link will be emailed to you. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={finalizing}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={(e) => { e.preventDefault(); finalizeRequest(); }} disabled={finalizing}>
+                  {finalizing ? "Finalizing…" : "Complete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Delete action */}
           {canArchiveDelete && (
