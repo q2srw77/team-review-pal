@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const VALID_ACTIONS = ["created", "updated", "archived", "deleted", "review_status_changed"];
+const VALID_ACTIONS = ["created", "updated", "archived", "deleted", "review_status_changed", "correction_decision_made", "resubmitted_for_review", "finalized_by_submitter"];
 const VALID_ENTITY_TYPES = ["review_request"];
 
 Deno.serve(async (req) => {
