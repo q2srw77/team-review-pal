@@ -382,7 +382,7 @@ Deno.serve(async (req) => {
       .createSignedUrl(fileName, 3600)
 
     // Send email to submitter
-    if (submitter?.email) {
+    if (submitter?.email && !skip_email) {
       await supabase.functions.invoke('send-transactional-email', {
         body: {
           templateName: 'review-completed',
