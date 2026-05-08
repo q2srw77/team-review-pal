@@ -138,8 +138,106 @@ export default function RequestDetail({
     setPositionLabel(((data as { position_label?: PositionLabel } | null)?.position_label ?? "None") as PositionLabel);
   };
 
-  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed";
+  const canEdit = user?.id === request?.submitted_by && request?.status !== "completed" && request?.status !== "correction";
   const canArchiveDelete = user?.id === request?.submitted_by || isAdmin;
+  const isSubmitter = user?.id === request?.submitted_by;
+  const inCorrection = request?.status === "correction";
+  const isLocked = request?.status === "completed" || request?.status === "correction";
+
+  // Reject dialog state
+  const [rejectingNoteId, setRejectingNoteId] = useState<string | null>(null);
+  const [rejectComment, setRejectComment] = useState("");
+  const [savingDecision, setSavingDecision] = useState<string | null>(null);
+
+  // Round history state
+  const [showPreviousRounds, setShowPreviousRounds] = useState(false);
+  const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
+
+  // Action button state
+  const [resubmitting, setResubmitting] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
+  const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
+
+  const setDecision = async (
+    noteId: string,
+    decision: "accepted" | "rejected",
+    comment?: string,
+  ) => {
+    if (!request || !user) return;
+    setSavingDecision(noteId);
+    const { error } = await supabase
+      .from("request_notes")
+      .update({
+        decision,
+        rejection_comment: decision === "rejected" ? (comment ?? "") : null,
+        decided_at: new Date().toISOString(),
+        decided_by: user.id,
+      })
+      .eq("id", noteId);
+    setSavingDecision(null);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    supabase.functions.invoke("write-audit-log", {
+      body: {
+        action: "correction_decision_made",
+        entity_type: "review_request",
+        entity_id: request.id,
+        details: { note_id: noteId, decision, has_rejection_comment: decision === "rejected" && !!(comment && comment.trim()) },
+      },
+    }).catch(() => {});
+    fetchNotes();
+  };
+
+  const handleAccept = (noteId: string) => setDecision(noteId, "accepted");
+
+  const openReject = (note: Note) => {
+    setRejectingNoteId(note.id);
+    setRejectComment(note.rejection_comment ?? "");
+  };
+
+  const confirmReject = async () => {
+    if (!rejectingNoteId || !rejectComment.trim()) return;
+    const id = rejectingNoteId;
+    const comment = rejectComment.trim();
+    setRejectingNoteId(null);
+    setRejectComment("");
+    await setDecision(id, "rejected", comment);
+  };
+
+  const resubmitForReview = async () => {
+    if (!request) return;
+    setResubmitting(true);
+    const { data, error } = await supabase.functions.invoke("resubmit-for-review", {
+      body: { request_id: request.id },
+    });
+    setResubmitting(false);
+    setShowResubmitConfirm(false);
+    if (error) {
+      toast({ title: "Error", description: (data as any)?.error ?? error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Re-submitted", description: "Reviewers have been notified for the new round." });
+    onUpdated();
+  };
+
+  const finalizeRequest = async () => {
+    if (!request) return;
+    setFinalizing(true);
+    const { data, error } = await supabase.functions.invoke("finalize-review-request", {
+      body: { request_id: request.id },
+    });
+    setFinalizing(false);
+    setShowFinalizeConfirm(false);
+    if (error) {
+      toast({ title: "Error", description: (data as any)?.error ?? error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Completed", description: "The request is locked and a report has been emailed to you." });
+    onUpdated();
+  };
 
   const enterEditMode = async () => {
     if (!request) return;
