@@ -899,7 +899,7 @@ export default function RequestDetail({
               ))}
             </div>
 
-            {isReviewer && request.status !== "completed" && (
+            {isReviewer && !isLocked && (
               <div className="mt-4 space-y-2">
                 {positionLabel !== "None" && (
                   <div className="flex items-center gap-2">
