@@ -235,7 +235,16 @@ export default function RequestDetail({
       toast({ title: "Error", description: (data as any)?.error ?? error.message, variant: "destructive" });
       return;
     }
-    toast({ title: "Completed", description: "The request is locked and a report has been emailed to you." });
+    const warnings = [(data as any)?.pdfWarning, (data as any)?.emailWarning].filter(Boolean);
+    if (warnings.length > 0) {
+      toast({
+        title: "Completed with issues",
+        description: `The request is locked, but: ${warnings.join("; ")}.`,
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Completed", description: "The request is locked and a report has been emailed to you." });
+    }
     onUpdated();
   };
 
