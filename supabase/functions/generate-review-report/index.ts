@@ -120,21 +120,24 @@ Deno.serve(async (req) => {
       positionLabel = (platformRow as { position_label?: string } | null)?.position_label ?? 'None'
     }
 
-    // Fetch reviewer notes
+    // Fetch reviewer notes (all rounds)
     const { data: notesRaw } = await supabase
       .from('request_notes')
-      .select('content, created_at, author_id, position_number')
+      .select('content, created_at, author_id, position_number, decision, rejection_comment, decided_at, round_number, archived')
       .eq('request_id', request_id)
+      .order('round_number', { ascending: true })
       .order('created_at', { ascending: true })
 
-    const notes = positionLabel !== 'None'
-      ? [...(notesRaw ?? [])].sort((a: any, b: any) => {
+    const sortNotes = (arr: any[]) => positionLabel !== 'None'
+      ? [...arr].sort((a: any, b: any) => {
           const ax = a.position_number ?? Number.MAX_SAFE_INTEGER
           const bx = b.position_number ?? Number.MAX_SAFE_INTEGER
           if (ax !== bx) return ax - bx
           return String(a.created_at).localeCompare(String(b.created_at))
         })
-      : (notesRaw ?? [])
+      : arr
+
+    const notes = notesRaw ?? []
 
     const noteAuthorIds = [...new Set(notes?.map((n: any) => n.author_id) ?? [])]
     let noteAuthorNames = new Map<string, string>()
