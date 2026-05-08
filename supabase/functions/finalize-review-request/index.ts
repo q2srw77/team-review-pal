@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
           Authorization: `Bearer ${serviceRoleKey}`,
           apikey: anonKey,
         },
-        body: JSON.stringify({ request_id }),
+        body: JSON.stringify({ request_id, skip_email: true }),
       });
     } catch (e) {
       console.error("generate-review-report failed", e);
