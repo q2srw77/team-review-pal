@@ -1,84 +1,70 @@
-# Fix: "Complete" returns the same edge function error
+# Fix: Submitter has no actions when reviewer completes with no notes
 
 ## Root cause
 
-Edge function log:
-```
-finalize-review-request error { code: "P0001",
-  message: "Reviewers cannot modify these fields on a review request" }
-```
+In `src/components/RequestDetail.tsx`, the Correction action bar (Re-Submit / Complete) is rendered with this guard:
 
-The `finalize-review-request` edge function (service role) runs:
-```sql
-UPDATE review_requests
-SET status = 'completed', closed_reason = 'submitter_finalized'
-WHERE id = $1;
+```tsx
+{inCorrection && isSubmitter && currentNotes.length > 0 && (
+  // ...Re-Submit + Complete buttons
+)}
 ```
 
-The `BEFORE UPDATE` trigger `guard_review_request_columns` on `review_requests` fires. With service role, `auth.uid()` is `NULL`, so:
-- `is_admin` = false (`has_role(NULL, 'admin')` = false)
-- `is_submitter` = false (NULL ≠ submitted_by)
-
-It falls through to the "reviewer" branch, sees `closed_reason` changed, and raises the error.
-
-This is the same class of bug as the prior `prevent_note_edit_when_completed` fix: the guard treats unauthenticated/service-role contexts as "reviewer" rather than allowing internal callers.
+When all reviewers complete without leaving any notes, the request transitions to `correction` but `currentNotes.length === 0`, so the entire action bar is hidden. The submitter is stuck — they can see the "Correction" status banner but have no way to finalize the request.
 
 ## Fix
 
-One migration that updates `guard_review_request_columns` to short-circuit and allow the change when `auth.uid() IS NULL` (service role / internal SECURITY DEFINER). The reviewer-edit protections remain unchanged for authenticated reviewer users.
+Show the action bar whenever the request is in `correction` and the user is the submitter, regardless of note count. When there are no notes:
 
-```sql
-CREATE OR REPLACE FUNCTION public.guard_review_request_columns()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  is_admin boolean;
-  is_submitter boolean;
-BEGIN
-  -- Service role / internal SECURITY DEFINER callers (auth.uid() is NULL):
-  -- allow. The only legitimate paths here are the resubmit-for-review and
-  -- finalize-review-request edge functions plus internal triggers.
-  IF auth.uid() IS NULL THEN
-    RETURN NEW;
-  END IF;
+- **Complete** is enabled (no pending decisions blocks it; `pendingTotal === 0`).
+- **Re-Submit for Review** stays disabled (already gated by `rejectedTotal === 0`).
+- The summary line ("X of Y comments reviewed…") is replaced with a friendly empty-state message: "No reviewer comments were left. You can complete the review."
 
-  is_admin := public.has_role(auth.uid(), 'admin'::app_role);
-  is_submitter := (auth.uid() = OLD.submitted_by);
+Single edit in `src/components/RequestDetail.tsx` around lines 951–977:
 
-  IF is_admin OR is_submitter THEN
-    RETURN NEW;
-  END IF;
-
-  -- Reviewer path: block edits to descriptive/ownership fields.
-  -- `status` is intentionally excluded — managed by auto_update_request_status()
-  -- and submitter-only edge functions.
-  IF NEW.submitted_by IS DISTINCT FROM OLD.submitted_by
-     OR NEW.team_id IS DISTINCT FROM OLD.team_id
-     OR NEW.title IS DISTINCT FROM OLD.title
-     OR NEW.platform IS DISTINCT FROM OLD.platform
-     OR NEW.url_location IS DISTINCT FROM OLD.url_location
-     OR NEW.complete_by IS DISTINCT FROM OLD.complete_by
-     OR NEW.closed_reason IS DISTINCT FROM OLD.closed_reason
-     OR NEW.report_pdf_path IS DISTINCT FROM OLD.report_pdf_path
-     OR NEW.notes IS DISTINCT FROM OLD.notes THEN
-    RAISE EXCEPTION 'Reviewers cannot modify these fields on a review request';
-  END IF;
-
-  RETURN NEW;
-END;
-$function$;
+```tsx
+{inCorrection && isSubmitter && (
+  <div className="mt-4 rounded-lg border bg-card p-3 space-y-3">
+    {currentNotes.length > 0 ? (
+      <div className="text-xs text-muted-foreground">
+        {reviewedTotal} of {decisionsTotal} comments reviewed ({acceptedTotal} accepted, {rejectedTotal} rejected)
+        {pendingTotal > 0 && <span className="ml-1">· {pendingTotal} pending</span>}
+      </div>
+    ) : (
+      <div className="text-xs text-muted-foreground">
+        No reviewer comments were left. You can complete the review.
+      </div>
+    )}
+    <div className="flex flex-wrap gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={resubmitting || rejectedTotal === 0}
+        onClick={() => setShowResubmitConfirm(true)}
+      >
+        <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+        {resubmitting ? "Re-submitting…" : "Re-Submit for Review"}
+      </Button>
+      <Button
+        size="sm"
+        disabled={finalizing || pendingTotal > 0}
+        onClick={() => setShowFinalizeConfirm(true)}
+      >
+        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+        {finalizing ? "Finalizing…" : "Complete"}
+      </Button>
+    </div>
+  </div>
+)}
 ```
 
 ## Out of scope
 
-- No frontend or edge function changes.
-- No RLS changes — RLS already restricts which authenticated users can UPDATE `review_requests`.
+- No backend / edge function changes. `finalize-review-request` already handles the no-notes path correctly (`pendingNotes` array is empty, `pending.length === 0`, finalization proceeds and the PDF/email use `acceptedCount = rejectedCount = 0`).
+- No changes to the report template or email content.
 
 ## Verification
 
-1. As submitter on a request in `correction` with all decisions made, click **Complete** → status becomes `completed`, `closed_reason = 'submitter_finalized'`, PDF generated, finalized email sent.
-2. As reviewer, attempt direct REST PATCH to set `closed_reason` or `title` → still rejected.
-3. **Re-Submit for Review** still works (already verified after the previous trigger fix).
+1. As a reviewer on a request with no notes, mark Completed → request moves to `correction`.
+2. As the submitter, open the request → the action bar shows with **Re-Submit** disabled and **Complete** enabled, plus the empty-state message.
+3. Click **Complete** → request finalizes, PDF generates, finalized email is sent.

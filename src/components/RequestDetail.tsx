@@ -948,12 +948,18 @@ export default function RequestDetail({
                     {currentNotes.map((n) => renderNote(n, { readOnly: false }))}
                   </div>
 
-                  {inCorrection && isSubmitter && currentNotes.length > 0 && (
+                  {inCorrection && isSubmitter && (
                     <div className="mt-4 rounded-lg border bg-card p-3 space-y-3">
-                      <div className="text-xs text-muted-foreground">
-                        {reviewedTotal} of {decisionsTotal} comments reviewed ({acceptedTotal} accepted, {rejectedTotal} rejected)
-                        {pendingTotal > 0 && <span className="ml-1">· {pendingTotal} pending</span>}
-                      </div>
+                      {currentNotes.length > 0 ? (
+                        <div className="text-xs text-muted-foreground">
+                          {reviewedTotal} of {decisionsTotal} comments reviewed ({acceptedTotal} accepted, {rejectedTotal} rejected)
+                          {pendingTotal > 0 && <span className="ml-1">· {pendingTotal} pending</span>}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          No reviewer comments were left. You can complete the review.
+                        </div>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <Button
                           variant="outline"
