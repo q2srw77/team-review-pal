@@ -39,6 +39,12 @@ interface Note {
   author_id: string;
   author_name: string;
   position_number: number | null;
+  decision: "pending" | "accepted" | "rejected";
+  rejection_comment: string | null;
+  decided_at: string | null;
+  decided_by: string | null;
+  round_number: number;
+  archived: boolean;
 }
 
 interface ReviewerStatus {
