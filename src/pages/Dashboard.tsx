@@ -139,8 +139,9 @@ export default function Dashboard({ onNavigateSettings, onNavigateProfile }: { o
   useEffect(() => { setStatusFilter("all"); }, [view]);
 
   const activeRequests = allRequests.filter((r) => r.status === "pending" || r.status === "in_review");
+  const correctionRequests = allRequests.filter((r) => r.status === "correction");
   const completedRequests = allRequests.filter((r) => r.status === "completed");
-  const baseRequests = view === "active" ? activeRequests : completedRequests;
+  const baseRequests = view === "active" ? activeRequests : view === "correction" ? correctionRequests : completedRequests;
 
   const platformOptions = useMemo(() => {
     const set = new Set<string>();
