@@ -276,7 +276,7 @@ export default function RequestDetail({
     if (!request) return;
     const { data } = await supabase
       .from("request_notes")
-      .select("id, content, created_at, author_id, position_number")
+      .select("id, content, created_at, author_id, position_number, decision, rejection_comment, decided_at, decided_by, round_number, archived")
       .eq("request_id", request.id)
       .order("created_at", { ascending: true });
 
@@ -291,13 +291,19 @@ export default function RequestDetail({
     const nameMap = new Map(profiles?.map((p) => [p.user_id, p.full_name]) ?? []);
 
     setNotes(
-      data.map((n: { id: string; content: string; created_at: string; author_id: string; position_number: number | null }) => ({
+      data.map((n: any) => ({
         id: n.id,
         content: n.content,
         created_at: n.created_at,
         author_id: n.author_id,
         author_name: nameMap.get(n.author_id) ?? "Unknown",
         position_number: n.position_number,
+        decision: (n.decision ?? "pending") as Note["decision"],
+        rejection_comment: n.rejection_comment ?? null,
+        decided_at: n.decided_at ?? null,
+        decided_by: n.decided_by ?? null,
+        round_number: n.round_number ?? 1,
+        archived: !!n.archived,
       }))
     );
   };
