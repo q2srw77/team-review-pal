@@ -843,7 +843,7 @@ export default function RequestDetail({
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), "MMM d, h:mm a")}</span>
-                      {user?.id === note.author_id && request.status !== "completed" && editingNoteId !== note.id && (
+                      {user?.id === note.author_id && !isLocked && editingNoteId !== note.id && (
                         <Button
                           size="icon"
                           variant="ghost"
