@@ -147,37 +147,36 @@ Deno.serve(async (req) => {
     let emailWarning: string | null = null;
     if (submitter?.email) {
       try {
-        const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceRoleKey}`,
-            apikey: anonKey,
-          },
-          body: JSON.stringify({
-            templateName: "review-finalized",
-            recipientEmail: submitter.email,
-            idempotencyKey: `review-finalized-${request_id}`,
-            templateData: {
-              title: request.title,
-              platform: request.platform,
-              teamName: team?.name ?? null,
-              roundCount: currentRound,
-              acceptedCount,
-              rejectedCount,
-              totalNotes: acceptedCount + rejectedCount,
-              downloadUrl,
+        const { data: emailData, error: emailErr } = await service.functions.invoke(
+          "send-transactional-email",
+          {
+            body: {
+              templateName: "review-finalized",
+              recipientEmail: submitter.email,
+              idempotencyKey: `review-finalized-${request_id}`,
+              templateData: {
+                title: request.title,
+                platform: request.platform,
+                teamName: team?.name ?? null,
+                roundCount: currentRound,
+                acceptedCount,
+                rejectedCount,
+                totalNotes: acceptedCount + rejectedCount,
+                downloadUrl,
+              },
             },
-          }),
-        });
-        if (!emailRes.ok) {
-          const body = await emailRes.text();
-          console.error("send-transactional-email non-2xx", emailRes.status, body);
-          emailWarning = `Email send failed (${emailRes.status})`;
+          },
+        );
+        if (emailErr) {
+          console.error("send-transactional-email invoke error", emailErr, emailData);
+          emailWarning = `Email send failed: ${emailErr.message ?? "unknown"}`;
+        } else if (emailData?.error) {
+          console.error("send-transactional-email returned error", emailData);
+          emailWarning = `Email send failed: ${emailData.error}`;
         }
       } catch (e) {
         console.error("send finalize email failed", e);
-        emailWarning = "Email send failed";
+        emailWarning = `Email send failed: ${(e as Error).message}`;
       }
     } else {
       emailWarning = "No submitter email on file";
