@@ -105,23 +105,20 @@ Deno.serve(async (req) => {
     }
     let pdfWarning: string | null = null;
     try {
-      const pdfRes = await fetch(`${supabaseUrl}/functions/v1/generate-review-report`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceRoleKey}`,
-          apikey: anonKey,
-        },
-        body: JSON.stringify({ request_id, skip_email: true }),
-      });
-      if (!pdfRes.ok) {
-        const body = await pdfRes.text();
-        console.error("generate-review-report non-2xx", pdfRes.status, body);
-        pdfWarning = `PDF generation failed (${pdfRes.status})`;
+      const { data: pdfData, error: pdfErr } = await service.functions.invoke(
+        "generate-review-report",
+        { body: { request_id, skip_email: true } },
+      );
+      if (pdfErr) {
+        console.error("generate-review-report invoke error", pdfErr, pdfData);
+        pdfWarning = `PDF generation failed: ${pdfErr.message ?? "unknown"}`;
+      } else if (pdfData?.error) {
+        console.error("generate-review-report returned error", pdfData);
+        pdfWarning = `PDF generation failed: ${pdfData.error}`;
       }
     } catch (e) {
       console.error("generate-review-report failed", e);
-      pdfWarning = "PDF generation failed";
+      pdfWarning = `PDF generation failed: ${(e as Error).message}`;
     }
 
     // Get fresh report path + signed URL
