@@ -105,23 +105,20 @@ Deno.serve(async (req) => {
     }
     let pdfWarning: string | null = null;
     try {
-      const pdfRes = await fetch(`${supabaseUrl}/functions/v1/generate-review-report`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serviceRoleKey}`,
-          apikey: anonKey,
-        },
-        body: JSON.stringify({ request_id, skip_email: true }),
-      });
-      if (!pdfRes.ok) {
-        const body = await pdfRes.text();
-        console.error("generate-review-report non-2xx", pdfRes.status, body);
-        pdfWarning = `PDF generation failed (${pdfRes.status})`;
+      const { data: pdfData, error: pdfErr } = await service.functions.invoke(
+        "generate-review-report",
+        { body: { request_id, skip_email: true } },
+      );
+      if (pdfErr) {
+        console.error("generate-review-report invoke error", pdfErr, pdfData);
+        pdfWarning = `PDF generation failed: ${pdfErr.message ?? "unknown"}`;
+      } else if (pdfData?.error) {
+        console.error("generate-review-report returned error", pdfData);
+        pdfWarning = `PDF generation failed: ${pdfData.error}`;
       }
     } catch (e) {
       console.error("generate-review-report failed", e);
-      pdfWarning = "PDF generation failed";
+      pdfWarning = `PDF generation failed: ${(e as Error).message}`;
     }
 
     // Get fresh report path + signed URL
@@ -150,37 +147,36 @@ Deno.serve(async (req) => {
     let emailWarning: string | null = null;
     if (submitter?.email) {
       try {
-        const emailRes = await fetch(`${supabaseUrl}/functions/v1/send-transactional-email`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${serviceRoleKey}`,
-            apikey: anonKey,
-          },
-          body: JSON.stringify({
-            templateName: "review-finalized",
-            recipientEmail: submitter.email,
-            idempotencyKey: `review-finalized-${request_id}`,
-            templateData: {
-              title: request.title,
-              platform: request.platform,
-              teamName: team?.name ?? null,
-              roundCount: currentRound,
-              acceptedCount,
-              rejectedCount,
-              totalNotes: acceptedCount + rejectedCount,
-              downloadUrl,
+        const { data: emailData, error: emailErr } = await service.functions.invoke(
+          "send-transactional-email",
+          {
+            body: {
+              templateName: "review-finalized",
+              recipientEmail: submitter.email,
+              idempotencyKey: `review-finalized-${request_id}`,
+              templateData: {
+                title: request.title,
+                platform: request.platform,
+                teamName: team?.name ?? null,
+                roundCount: currentRound,
+                acceptedCount,
+                rejectedCount,
+                totalNotes: acceptedCount + rejectedCount,
+                downloadUrl,
+              },
             },
-          }),
-        });
-        if (!emailRes.ok) {
-          const body = await emailRes.text();
-          console.error("send-transactional-email non-2xx", emailRes.status, body);
-          emailWarning = `Email send failed (${emailRes.status})`;
+          },
+        );
+        if (emailErr) {
+          console.error("send-transactional-email invoke error", emailErr, emailData);
+          emailWarning = `Email send failed: ${emailErr.message ?? "unknown"}`;
+        } else if (emailData?.error) {
+          console.error("send-transactional-email returned error", emailData);
+          emailWarning = `Email send failed: ${emailData.error}`;
         }
       } catch (e) {
         console.error("send finalize email failed", e);
-        emailWarning = "Email send failed";
+        emailWarning = `Email send failed: ${(e as Error).message}`;
       }
     } else {
       emailWarning = "No submitter email on file";
