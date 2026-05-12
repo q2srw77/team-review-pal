@@ -33,9 +33,20 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
-    const { request_id } = await req.json();
+    const { request_id, new_complete_by } = await req.json();
     if (!request_id || typeof request_id !== "string") {
       return new Response(JSON.stringify({ error: "request_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!new_complete_by || typeof new_complete_by !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(new_complete_by)) {
+      return new Response(JSON.stringify({ error: "new_complete_by required (YYYY-MM-DD)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    if (new_complete_by <= todayUtc) {
+      return new Response(JSON.stringify({ error: "new_complete_by must be a future date" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
