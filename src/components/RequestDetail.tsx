@@ -1181,17 +1181,54 @@ export default function RequestDetail({
           </AlertDialog>
 
           {/* Re-submit confirm */}
-          <AlertDialog open={showResubmitConfirm} onOpenChange={setShowResubmitConfirm}>
+          <AlertDialog
+            open={showResubmitConfirm}
+            onOpenChange={(v) => {
+              setShowResubmitConfirm(v);
+              if (!v) setResubmitCompleteBy(undefined);
+            }}
+          >
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Re-submit for review?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  The current round of comments will be archived, reviewer statuses will be reset, and reviewers will be emailed to start a new round.
+                  Set a new complete-by deadline. The current round of comments will be archived, reviewer statuses reset, and reviewers emailed to start round {(request?.current_round ?? 1) + 1}.
                 </AlertDialogDescription>
               </AlertDialogHeader>
+              <div className="space-y-2 py-2">
+                <label className="text-sm font-medium">New Complete By</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !resubmitCompleteBy && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      {resubmitCompleteBy ? format(resubmitCompleteBy, "MMM d, yyyy") : "Pick a future date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={resubmitCompleteBy}
+                      onSelect={setResubmitCompleteBy}
+                      disabled={(date) => date <= new Date(new Date().toISOString().slice(0, 10) + "T23:59:59")}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">Must be a future date. Reminders and auto-advance will use this new deadline.</p>
+              </div>
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={resubmitting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={(e) => { e.preventDefault(); resubmitForReview(); }} disabled={resubmitting}>
+                <AlertDialogAction
+                  onClick={(e) => { e.preventDefault(); resubmitForReview(); }}
+                  disabled={resubmitting || !resubmitCompleteBy}
+                >
                   {resubmitting ? "Re-submitting…" : "Re-Submit"}
                 </AlertDialogAction>
               </AlertDialogFooter>
