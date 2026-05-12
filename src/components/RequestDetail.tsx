@@ -244,17 +244,21 @@ export default function RequestDetail({
   };
 
   const resubmitForReview = async () => {
-    if (!request) return;
+    if (!request || !resubmitCompleteBy) return;
     setResubmitting(true);
     const { data, error } = await supabase.functions.invoke("resubmit-for-review", {
-      body: { request_id: request.id },
+      body: {
+        request_id: request.id,
+        new_complete_by: format(resubmitCompleteBy, "yyyy-MM-dd"),
+      },
     });
     setResubmitting(false);
-    setShowResubmitConfirm(false);
     if (error) {
       toast({ title: "Error", description: (data as any)?.error ?? error.message, variant: "destructive" });
       return;
     }
+    setShowResubmitConfirm(false);
+    setResubmitCompleteBy(undefined);
     toast({ title: "Re-submitted", description: "Reviewers have been notified for the new round." });
     onUpdated();
   };
