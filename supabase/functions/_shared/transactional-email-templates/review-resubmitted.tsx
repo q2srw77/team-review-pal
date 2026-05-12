@@ -12,9 +12,10 @@ interface ReviewResubmittedProps {
   round?: number
   requestUrl?: string
   reviewerName?: string
+  completeBy?: string
 }
 
-const ReviewResubmittedEmail = ({ title, round, requestUrl, reviewerName }: ReviewResubmittedProps) => (
+const ReviewResubmittedEmail = ({ title, round, requestUrl, reviewerName, completeBy }: ReviewResubmittedProps) => (
   <Html lang="en" dir="ltr">
     <Head />
     <Preview>{title ?? 'A review request'} — round {round ?? 2} ready for review</Preview>
@@ -27,8 +28,13 @@ const ReviewResubmittedEmail = ({ title, round, requestUrl, reviewerName }: Revi
         <Text style={text}>
           The submitter has reviewed your previous comments on <strong>{title ?? 'a review request'}</strong> and started a new review round (round {round ?? 2}). Your previous round is archived for reference.
         </Text>
+        {completeBy && (
+          <Text style={text}>
+            <strong>Complete by:</strong> {completeBy}
+          </Text>
+        )}
         <Text style={text}>
-          Please review the latest version and submit your updated comments.
+          Please review the latest version and submit your updated comments before the deadline.
         </Text>
 
         {requestUrl && (
