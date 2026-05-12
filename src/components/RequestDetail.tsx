@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, XCircle, Loader2, Download, Pencil, X, Save, Trash2, Lock, Maximize2, Minimize2, RotateCcw, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, XCircle, Loader2, Download, Pencil, X, Save, Trash2, Lock, Maximize2, Minimize2, RotateCcw, Check, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
