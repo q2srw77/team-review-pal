@@ -701,10 +701,25 @@ export default function RequestDetail({
                   </PopoverContent>
                 </Popover>
               ) : (
-                <span className="flex items-center gap-1">
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "Not set"}
-                </span>
+                <div className="space-y-1">
+                  <span className="flex items-center gap-1 flex-wrap">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "Not set"}
+                    {deadlineTier !== "none" && (
+                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 ml-1 inline-flex items-center gap-1", deadlineBadgeClass)}>
+                        {deadlineTier === "overdue"
+                          ? <AlertTriangle className="w-3 h-3" />
+                          : <Clock className="w-3 h-3" />}
+                        {deadlineLabel}
+                      </Badge>
+                    )}
+                  </span>
+                  {deadlineActive && request.complete_by && (
+                    <span className="block text-[11px] text-muted-foreground">
+                      Auto-advances to Correction after this date.
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             <div>
