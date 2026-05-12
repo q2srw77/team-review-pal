@@ -60,6 +60,7 @@ export const template = {
     round: 2,
     requestUrl: 'https://example.com/dashboard',
     reviewerName: 'Jane',
+    completeBy: '2026-04-25',
   },
 } satisfies TemplateEntry
 
