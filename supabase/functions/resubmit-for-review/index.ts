@@ -161,6 +161,7 @@ Deno.serve(async (req) => {
                 round: newRound,
                 reviewerName: p.full_name,
                 requestUrl,
+                completeBy: new_complete_by,
               },
             }),
           });
