@@ -192,6 +192,7 @@ export default function RequestDetail({
   const [resubmitting, setResubmitting] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
+  const [resubmitCompleteBy, setResubmitCompleteBy] = useState<Date | undefined>();
   const [showFinalizeConfirm, setShowFinalizeConfirm] = useState(false);
 
   const setDecision = async (
