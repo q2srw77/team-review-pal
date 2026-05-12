@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, XCircle, Loader2, Download, Pencil, X, Save, Trash2, Lock, Maximize2, Minimize2, RotateCcw, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { ExternalLink, Send, Clock, User, Users, Calendar as CalendarIcon, CheckCircle2, Circle, XCircle, Loader2, Download, Pencil, X, Save, Trash2, Lock, Maximize2, Minimize2, RotateCcw, Check, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +23,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, differenceInCalendarDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -143,6 +143,41 @@ export default function RequestDetail({
   const isSubmitter = user?.id === request?.submitted_by;
   const inCorrection = request?.status === "correction";
   const isLocked = request?.status === "completed" || request?.status === "correction";
+
+  // Deadline urgency (only meaningful while the request is still active)
+  const deadlineActive = request?.status === "pending" || request?.status === "in_review";
+  const daysUntilDeadline = request?.complete_by
+    ? differenceInCalendarDays(new Date(request.complete_by + "T00:00:00"), new Date(new Date().toISOString().slice(0, 10) + "T00:00:00"))
+    : null;
+  type DeadlineTier = "none" | "soft" | "warn" | "today" | "overdue";
+  const deadlineTier: DeadlineTier =
+    !deadlineActive || daysUntilDeadline === null
+      ? "none"
+      : daysUntilDeadline < 0
+      ? "overdue"
+      : daysUntilDeadline === 0
+      ? "today"
+      : daysUntilDeadline <= 3
+      ? "warn"
+      : daysUntilDeadline <= 7
+      ? "soft"
+      : "none";
+  const deadlineLabel =
+    deadlineTier === "overdue"
+      ? "Overdue — auto-advances soon"
+      : deadlineTier === "today"
+      ? "Due today"
+      : daysUntilDeadline === 1
+      ? "Due tomorrow"
+      : deadlineTier === "warn" || deadlineTier === "soft"
+      ? `Due in ${daysUntilDeadline} days`
+      : "";
+  const deadlineBadgeClass =
+    deadlineTier === "overdue"
+      ? "bg-destructive/15 text-destructive border-destructive/40"
+      : deadlineTier === "today" || deadlineTier === "warn"
+      ? "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.4)]"
+      : "bg-muted text-muted-foreground border-border";
 
   // Reject dialog state
   const [rejectingNoteId, setRejectingNoteId] = useState<string | null>(null);
@@ -666,10 +701,25 @@ export default function RequestDetail({
                   </PopoverContent>
                 </Popover>
               ) : (
-                <span className="flex items-center gap-1">
-                  <CalendarIcon className="w-3.5 h-3.5" />
-                  {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "Not set"}
-                </span>
+                <div className="space-y-1">
+                  <span className="flex items-center gap-1 flex-wrap">
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    {request.complete_by ? format(new Date(request.complete_by), "MMM d, yyyy") : "Not set"}
+                    {deadlineTier !== "none" && (
+                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5 ml-1 inline-flex items-center gap-1", deadlineBadgeClass)}>
+                        {deadlineTier === "overdue"
+                          ? <AlertTriangle className="w-3 h-3" />
+                          : <Clock className="w-3 h-3" />}
+                        {deadlineLabel}
+                      </Badge>
+                    )}
+                  </span>
+                  {deadlineActive && request.complete_by && (
+                    <span className="block text-[11px] text-muted-foreground">
+                      Auto-advances to Correction after this date.
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             <div>
@@ -752,6 +802,33 @@ export default function RequestDetail({
                   <strong>This review is in Correction.</strong> The submitter is reviewing comments and will either re-submit or complete the request.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Deadline banner (active requests only, due today or overdue) */}
+          {deadlineActive && (deadlineTier === "today" || deadlineTier === "overdue") && (
+            <div
+              className={cn(
+                "rounded-md border p-3 text-sm flex items-start gap-2",
+                deadlineTier === "overdue"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : "border-[hsl(var(--status-pending)/0.4)] bg-[hsl(var(--status-pending)/0.1)] text-[hsl(var(--status-pending))]"
+              )}
+            >
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                {deadlineTier === "overdue" ? (
+                  <>
+                    <strong>Past complete-by date.</strong> Tonight's auto-advance will mark any
+                    incomplete reviewers as complete and move this request to Correction.
+                  </>
+                ) : (
+                  <>
+                    <strong>Due today.</strong> If reviewers don't finish, tonight's auto-advance
+                    will move this request to Correction.
+                  </>
+                )}
+              </span>
             </div>
           )}
 
