@@ -33,9 +33,20 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string;
 
-    const { request_id } = await req.json();
+    const { request_id, new_complete_by } = await req.json();
     if (!request_id || typeof request_id !== "string") {
       return new Response(JSON.stringify({ error: "request_id required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (!new_complete_by || typeof new_complete_by !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(new_complete_by)) {
+      return new Response(JSON.stringify({ error: "new_complete_by required (YYYY-MM-DD)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    if (new_complete_by <= todayUtc) {
+      return new Response(JSON.stringify({ error: "new_complete_by must be a future date" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -84,10 +95,15 @@ Deno.serve(async (req) => {
 
     const newRound = currentRound + 1;
 
-    // Bump round + reset status to pending; the trigger will re-evaluate when statuses change
+    // Bump round + reset status to pending; update deadline; clear closed_reason
     const { error: bumpErr } = await service
       .from("review_requests")
-      .update({ current_round: newRound, status: "pending" })
+      .update({
+        current_round: newRound,
+        status: "pending",
+        complete_by: new_complete_by,
+        closed_reason: null,
+      })
       .eq("id", request_id);
     if (bumpErr) throw bumpErr;
 
@@ -105,6 +121,9 @@ Deno.serve(async (req) => {
       if (rsErr) throw rsErr;
     }
 
+    // Purge prior reminder dedupe rows so reminders fire against the new deadline
+    await service.from("review_reminders_sent").delete().eq("request_id", request_id);
+
     // Audit log
     await service.from("audit_logs").insert({
       user_id: userId,
@@ -112,7 +131,7 @@ Deno.serve(async (req) => {
       action: "resubmitted_for_review",
       entity_type: "review_request",
       entity_id: request_id,
-      details: { from_round: currentRound, to_round: newRound, rejected_count: rejectedCount },
+      details: { from_round: currentRound, to_round: newRound, rejected_count: rejectedCount, new_complete_by },
     });
 
     // Email each reviewer
@@ -142,6 +161,7 @@ Deno.serve(async (req) => {
                 round: newRound,
                 reviewerName: p.full_name,
                 requestUrl,
+                completeBy: new_complete_by,
               },
             }),
           });

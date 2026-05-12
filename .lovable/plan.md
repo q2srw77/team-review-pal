@@ -1,40 +1,52 @@
 ## Goal
 
-Send reviewers an email reminder **1 day before** the `complete_by` date and again **on the due date itself**, so they're prompted to finish before the nightly auto-advance moves the request to Correction.
+Let the submitter resubmit a request for review **as many times as needed**, and require them to set a **new `complete_by` deadline** each time. The new deadline drives the next round's auto-advance and reminders.
 
-## Current state
+## Findings
 
-`supabase/functions/send-review-reminders/index.ts` already loops over outstanding reviewers, dedupes via `review_reminders_sent (request_id, reviewer_id, days_before)`, and sends the `review-reminder` template. Today it iterates `[2, 1]`. We just need to change which days it targets and tighten the copy for the due-date case.
+- **There is no hard limit** on resubmits in the code: `supabase/functions/resubmit-for-review/index.ts` simply increments `current_round`, archives the round's notes, and resets reviewer statuses. The UI's "Re-Submit for Review" button has no round-count gating either.
+- What *feels* like a "single send back" today:
+  1. `review_requests.complete_by` is **not updated** on resubmit, so round 2 inherits the original (often already-passed) deadline. The auto-close cron then immediately punts the request back to Correction.
+  2. `review_reminders_sent` is keyed `(request_id, reviewer_id, days_before)` with no round component, so reminders for round 2+ are deduped against round 1 and never fire.
+- Reviewer-progress visuals already work with `current_round`, and `request_notes` are scoped by `round_number`, so multiple rounds are already rendered correctly.
 
 ## Changes
 
-### 1. `supabase/functions/send-review-reminders/index.ts`
-- Change the loop from `[2, 1]` to `[1, 0]`.
-- `addDaysUTC(0)` already returns today (UTC), so the existing `complete_by = targetDate` query works for the due-date pass.
-- Idempotency still works: `(request_id, reviewer_id, days_before)` with `days_before = 0` is a distinct row from `days_before = 1`, so each reviewer gets at most one "1 day before" and one "due today" email per request.
-- Keep the `.neq("status", "completed")` filter so we don't remind on already-completed requests. (Requests already auto-advanced to `correction` won't have outstanding `pending`/`in_review` reviewer rows, so no email is sent — safe.)
+### 1. UI — `src/components/RequestDetail.tsx`
+- Replace the simple Re-Submit confirm dialog with a small form requiring a **new Complete By date**:
+  - Reuse the existing `Calendar` / `Popover` pattern from edit mode.
+  - Default the picker to `today + 7` days; minimum selectable date is **tomorrow** (deadline must be in the future).
+  - The "Re-Submit" action is disabled until a valid future date is picked.
+  - Copy update: "Set a new complete-by deadline. Reviewers will be notified to start round N+1."
+- Pass the chosen date to the edge function as `new_complete_by` (ISO `YYYY-MM-DD`).
+- After success, refresh as today (`onUpdated()` already reloads).
 
-### 2. `supabase/functions/_shared/transactional-email-templates/review-reminder.tsx`
-The template currently hardcodes "due in N days" wording, which reads awkwardly when `daysRemaining = 0`. Update it to handle the due-date case:
-- When `daysRemaining === 0`: subject "Review due today — {title}"; body leads with "Your review is due today" and warns that tonight's auto-advance will move the request to Correction if not finished.
-- When `daysRemaining === 1`: subject "Review due tomorrow — {title}"; body says "due tomorrow".
-- When `daysRemaining >= 2`: keep current "due in N days" wording (preserves backward compatibility if the array is ever extended).
-- Update `previewData.daysRemaining` to `1` so the preview reflects a realistic case.
+### 2. Edge function — `supabase/functions/resubmit-for-review/index.ts`
+- Accept and validate `new_complete_by` in the request body:
+  - Required, must parse as a date, must be **strictly after today** (UTC). Reject 400 otherwise.
+- Include `complete_by: new_complete_by` in the `review_requests` update alongside `current_round` and `status: 'pending'`.
+- Also clear `closed_reason` (it may be `'deadline_reached'` from a prior auto-advance) so the new round starts clean.
+- After bumping the round, **delete prior `review_reminders_sent` rows for this request** so the 1-day-before / due-day reminders fire again against the new deadline. (Service role already has full access to that table.)
+- Add `new_complete_by` to the audit log `details`.
+- Forward the new deadline to the `review-resubmitted` email template via `templateData.completeBy` so reviewers see the new date in their inbox.
 
-### 3. Deploy
-After the edits, redeploy `send-review-reminders` and `send-transactional-email` (the latter so the updated template ships).
+### 3. Email template — `supabase/functions/_shared/transactional-email-templates/review-resubmitted.tsx`
+- Add an optional `completeBy` prop and render it in the details block ("Complete by: …") so reviewers immediately see the updated deadline. Keep the prop optional for backward-compat.
+
+### 4. Deploy
+After edits, redeploy `resubmit-for-review` and `send-transactional-email`.
 
 ## Out of scope
 
-- No schema changes (`review_reminders_sent` already keys on `days_before`, including 0).
-- No change to the cron schedule itself — assumes the existing daily cron job invoking `send-review-reminders` continues to run once per day.
-- No change to the auto-close-to-correction flow.
-- No new template — we reuse `review-reminder` with conditional copy.
+- No schema changes. `review_requests.complete_by` is already nullable date; `review_reminders_sent` already has the right shape (we simply purge rows for the request).
+- No round cap. The system stays unlimited; each round just requires a new deadline.
+- No change to `auto-close-overdue-requests` — once `complete_by` is updated, the existing logic naturally handles the new round and will auto-advance to Correction again if the new deadline lapses.
+- No change to `finalize-review-request`. Submitter still controls completion.
 
 ## Verification
 
-1. Manually invoke `send-review-reminders` against a test request with `complete_by = today` → reviewer receives "due today" email; second invocation same day sends nothing (idempotency).
-2. Set `complete_by = tomorrow` → reviewer receives "due tomorrow" email.
-3. Set `complete_by` 3+ days out → no email sent.
-4. Reviewer who already completed their review → no email sent (they're filtered by `.in("status", ["pending", "in_review"])`).
-5. Confirm `email_send_log` shows two distinct entries per reviewer per request lifecycle (one for `days_before=1`, one for `days_before=0`).
+1. As submitter, open a request in Correction → click Re-Submit → confirm the dialog requires a future date and rejects today/past dates.
+2. Pick a date 5 days out → request transitions to `pending`, `complete_by` updates, `current_round` increments, reviewer statuses reset, reviewers receive the resubmit email showing the new deadline.
+3. Repeat the cycle a third time → round 3 works identically (proves no single-send-back limit).
+4. Manually invoke `send-review-reminders` after a resubmit with `complete_by = tomorrow` → the 1-day-before email now sends (proving the reminders-sent purge worked).
+5. Let a resubmitted request's deadline pass → nightly auto-close moves it back to Correction with `closed_reason = 'deadline_reached'`; submitter can resubmit again with yet another new date.
