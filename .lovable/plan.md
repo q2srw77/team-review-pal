@@ -1,60 +1,40 @@
 ## Goal
 
-Make it obvious to **reviewers** (and everyone else) when a Request is approaching, has reached, or has passed its `complete_by` deadline — i.e. when the daily auto-advance cron will kick the request into Correction. The "Complete By" date is already shown in the Meta grid, but there's no visual urgency or status, so reviewers don't realize the clock is running out.
+Send reviewers an email reminder **1 day before** the `complete_by` date and again **on the due date itself**, so they're prompted to finish before the nightly auto-advance moves the request to Correction.
 
-## Scope
+## Current state
 
-UI/presentation only. No business logic, schema, RLS, or backend changes. Everything is derived from the existing `review_requests.complete_by` column.
+`supabase/functions/send-review-reminders/index.ts` already loops over outstanding reviewers, dedupes via `review_reminders_sent (request_id, reviewer_id, days_before)`, and sends the `review-reminder` template. Today it iterates `[2, 1]`. We just need to change which days it targets and tighten the copy for the due-date case.
 
 ## Changes
 
-All in `src/components/RequestDetail.tsx`.
+### 1. `supabase/functions/send-review-reminders/index.ts`
+- Change the loop from `[2, 1]` to `[1, 0]`.
+- `addDaysUTC(0)` already returns today (UTC), so the existing `complete_by = targetDate` query works for the due-date pass.
+- Idempotency still works: `(request_id, reviewer_id, days_before)` with `days_before = 0` is a distinct row from `days_before = 1`, so each reviewer gets at most one "1 day before" and one "due today" email per request.
+- Keep the `.neq("status", "completed")` filter so we don't remind on already-completed requests. (Requests already auto-advanced to `correction` won't have outstanding `pending`/`in_review` reviewer rows, so no email is sent — safe.)
 
-### 1. Deadline indicator badge (next to "Complete By")
+### 2. `supabase/functions/_shared/transactional-email-templates/review-reminder.tsx`
+The template currently hardcodes "due in N days" wording, which reads awkwardly when `daysRemaining = 0`. Update it to handle the due-date case:
+- When `daysRemaining === 0`: subject "Review due today — {title}"; body leads with "Your review is due today" and warns that tonight's auto-advance will move the request to Correction if not finished.
+- When `daysRemaining === 1`: subject "Review due tomorrow — {title}"; body says "due tomorrow".
+- When `daysRemaining >= 2`: keep current "due in N days" wording (preserves backward compatibility if the array is ever extended).
+- Update `previewData.daysRemaining` to `1` so the preview reflects a realistic case.
 
-Compute `daysUntilDeadline = differenceInCalendarDays(complete_by, today)` (use `date-fns`, already imported). Render an inline badge to the right of the formatted date with these tiers:
-
-| Condition (status is `pending` or `in_review`)             | Badge text          | Tone (semantic token)             |
-|------------------------------------------------------------|---------------------|------------------------------------|
-| `daysUntilDeadline > 7`                                    | none                | —                                  |
-| `4 ≤ daysUntilDeadline ≤ 7`                                | "Due in N days"     | muted / default                    |
-| `1 ≤ daysUntilDeadline ≤ 3`                                | "Due in N days" (or "Due tomorrow" if 1) | `--status-pending` (amber)         |
-| `daysUntilDeadline === 0`                                  | "Due today"         | `--status-pending` solid           |
-| `daysUntilDeadline < 0`                                    | "Overdue — auto-advances soon" | `--destructive`                    |
-
-When `status` is `correction` or `completed`, suppress the badge (the request already moved past the auto-advance window).
-
-Use a small `Badge` (variant outline) with an icon (`Clock` for upcoming, `AlertTriangle` for overdue — both already in `lucide-react`).
-
-### 2. Deadline banner for reviewers when overdue or due-today
-
-Above the "Reviewer Progress" section, when the request is `pending`/`in_review` AND `daysUntilDeadline <= 0`, show a one-line banner:
-
-- Overdue (`< 0`): "This request is past its complete-by date. Tonight's auto-advance will mark any incomplete reviewers as complete and move it to Correction."
-- Due today (`=== 0`): "This request is due today. If reviewers don't finish, tonight's auto-advance will move it to Correction."
-
-Same color tokens as the badge tier above. Hide for submitter-only views? No — it's relevant to the submitter too (they can extend the date). Show to everyone, but only render at all for the affected statuses.
-
-### 3. "Auto-advances on" hint under the date
-
-Below the Complete By date (small muted text, only when `status` is `pending`/`in_review` and a date is set):
-
-> Auto-advances to Correction after this date.
-
-Keeps the rule discoverable without requiring an overdue state.
+### 3. Deploy
+After the edits, redeploy `send-review-reminders` and `send-transactional-email` (the latter so the updated template ships).
 
 ## Out of scope
 
-- No new column, no per-request override of the cron schedule.
-- No precise countdown to the cron run time (the cron is daily; "tonight" is accurate enough).
-- No changes to the Dashboard list view (separate request if wanted).
-- No notification/email changes.
-- No edit-mode changes — the existing date picker stays as-is.
+- No schema changes (`review_reminders_sent` already keys on `days_before`, including 0).
+- No change to the cron schedule itself — assumes the existing daily cron job invoking `send-review-reminders` continues to run once per day.
+- No change to the auto-close-to-correction flow.
+- No new template — we reuse `review-reminder` with conditional copy.
 
 ## Verification
 
-1. Open a request with `complete_by` 5 days out → Meta shows "Due in 5 days" muted.
-2. Edit `complete_by` to today → badge becomes amber "Due today" + banner appears above Reviewer Progress.
-3. Edit to yesterday → red "Overdue — auto-advances soon" badge + red banner.
-4. Move request to Correction or Completed → badge and banner disappear, only the date remains.
-5. Reviewer with their own visibility-restricted view sees the same indicator.
+1. Manually invoke `send-review-reminders` against a test request with `complete_by = today` → reviewer receives "due today" email; second invocation same day sends nothing (idempotency).
+2. Set `complete_by = tomorrow` → reviewer receives "due tomorrow" email.
+3. Set `complete_by` 3+ days out → no email sent.
+4. Reviewer who already completed their review → no email sent (they're filtered by `.in("status", ["pending", "in_review"])`).
+5. Confirm `email_send_log` shows two distinct entries per reviewer per request lifecycle (one for `days_before=1`, one for `days_before=0`).

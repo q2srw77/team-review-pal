@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
       errors: number;
     }> = [];
 
-    for (const daysBefore of [2, 1]) {
+    for (const daysBefore of [1, 0]) {
       const targetDate = addDaysUTC(daysBefore);
 
       const { data: requests, error: reqErr } = await service
