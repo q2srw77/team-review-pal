@@ -805,6 +805,33 @@ export default function RequestDetail({
             </div>
           )}
 
+          {/* Deadline banner (active requests only, due today or overdue) */}
+          {deadlineActive && (deadlineTier === "today" || deadlineTier === "overdue") && (
+            <div
+              className={cn(
+                "rounded-md border p-3 text-sm flex items-start gap-2",
+                deadlineTier === "overdue"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : "border-[hsl(var(--status-pending)/0.4)] bg-[hsl(var(--status-pending)/0.1)] text-[hsl(var(--status-pending))]"
+              )}
+            >
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                {deadlineTier === "overdue" ? (
+                  <>
+                    <strong>Past complete-by date.</strong> Tonight's auto-advance will mark any
+                    incomplete reviewers as complete and move this request to Correction.
+                  </>
+                ) : (
+                  <>
+                    <strong>Due today.</strong> If reviewers don't finish, tonight's auto-advance
+                    will move this request to Correction.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
           <Separator />
 
           {/* Reviewer Progress */}
