@@ -144,6 +144,41 @@ export default function RequestDetail({
   const inCorrection = request?.status === "correction";
   const isLocked = request?.status === "completed" || request?.status === "correction";
 
+  // Deadline urgency (only meaningful while the request is still active)
+  const deadlineActive = request?.status === "pending" || request?.status === "in_review";
+  const daysUntilDeadline = request?.complete_by
+    ? differenceInCalendarDays(new Date(request.complete_by + "T00:00:00"), new Date(new Date().toISOString().slice(0, 10) + "T00:00:00"))
+    : null;
+  type DeadlineTier = "none" | "soft" | "warn" | "today" | "overdue";
+  const deadlineTier: DeadlineTier =
+    !deadlineActive || daysUntilDeadline === null
+      ? "none"
+      : daysUntilDeadline < 0
+      ? "overdue"
+      : daysUntilDeadline === 0
+      ? "today"
+      : daysUntilDeadline <= 3
+      ? "warn"
+      : daysUntilDeadline <= 7
+      ? "soft"
+      : "none";
+  const deadlineLabel =
+    deadlineTier === "overdue"
+      ? "Overdue — auto-advances soon"
+      : deadlineTier === "today"
+      ? "Due today"
+      : daysUntilDeadline === 1
+      ? "Due tomorrow"
+      : deadlineTier === "warn" || deadlineTier === "soft"
+      ? `Due in ${daysUntilDeadline} days`
+      : "";
+  const deadlineBadgeClass =
+    deadlineTier === "overdue"
+      ? "bg-destructive/15 text-destructive border-destructive/40"
+      : deadlineTier === "today" || deadlineTier === "warn"
+      ? "bg-[hsl(var(--status-pending)/0.15)] text-[hsl(var(--status-pending))] border-[hsl(var(--status-pending)/0.4)]"
+      : "bg-muted text-muted-foreground border-border";
+
   // Reject dialog state
   const [rejectingNoteId, setRejectingNoteId] = useState<string | null>(null);
   const [rejectComment, setRejectComment] = useState("");
