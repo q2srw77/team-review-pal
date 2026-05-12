@@ -15,6 +15,12 @@ interface ReviewReminderProps {
   submitterName?: string
 }
 
+function timingPhrase(days: number): string {
+  if (days <= 0) return 'due today'
+  if (days === 1) return 'due tomorrow'
+  return `due in ${days} days`
+}
+
 const ReviewReminderEmail = ({
   title,
   platform,
@@ -23,21 +29,37 @@ const ReviewReminderEmail = ({
   completeBy,
   submitterName,
 }: ReviewReminderProps) => {
-  const dayLabel = daysRemaining === 1 ? 'day' : 'days'
+  const phrase = timingPhrase(daysRemaining)
+  const isDueToday = daysRemaining <= 0
   return (
     <Html lang="en" dir="ltr">
       <Head />
       <Preview>
-        Reminder: review due in {daysRemaining} {dayLabel}{title ? ` — ${title}` : ''}
+        {isDueToday
+          ? `Review due today${title ? ` — ${title}` : ''}`
+          : `Reminder: review ${phrase}${title ? ` — ${title}` : ''}`}
       </Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>Review reminder</Heading>
+          <Heading style={h1}>
+            {isDueToday ? 'Your review is due today' : 'Review reminder'}
+          </Heading>
           <Text style={text}>
-            This is a friendly reminder that your review
-            {title ? ` for "${title}"` : ''} is due in{' '}
-            <strong>{daysRemaining} {dayLabel}</strong>
-            {completeBy ? ` (by ${completeBy})` : ''}.
+            {isDueToday ? (
+              <>
+                Your review{title ? ` for "${title}"` : ''} is{' '}
+                <strong>due today</strong>
+                {completeBy ? ` (${completeBy})` : ''}. If it isn't completed,
+                tonight's auto-advance will move the request to Correction.
+              </>
+            ) : (
+              <>
+                This is a friendly reminder that your review
+                {title ? ` for "${title}"` : ''} is{' '}
+                <strong>{phrase}</strong>
+                {completeBy ? ` (by ${completeBy})` : ''}.
+              </>
+            )}
           </Text>
 
           <Section style={detailBox}>
@@ -59,9 +81,9 @@ const ReviewReminderEmail = ({
           </Section>
 
           <Text style={text}>
-            After the deadline passes, the request will be automatically closed
-            and your status will be frozen as-is. Please log in to {SITE_NAME}
-            to complete your review before then.
+            {isDueToday
+              ? `Please log in to ${SITE_NAME} and finish your review before the day ends to keep this request on track.`
+              : `Please log in to ${SITE_NAME} to complete your review before the deadline. After the complete-by date, the request will auto-advance to Correction.`}
           </Text>
 
           <Text style={footer}>— The {SITE_NAME} Team</Text>
@@ -74,17 +96,18 @@ const ReviewReminderEmail = ({
 export const template = {
   component: ReviewReminderEmail,
   subject: (data: Record<string, any>) => {
-    const days = data?.daysRemaining ?? 1
-    const dayLabel = days === 1 ? 'day' : 'days'
+    const days = typeof data?.daysRemaining === 'number' ? data.daysRemaining : 1
     const title = data?.title ? ` — ${data.title}` : ''
-    return `Reminder: review due in ${days} ${dayLabel}${title}`
+    if (days <= 0) return `Review due today${title}`
+    if (days === 1) return `Reminder: review due tomorrow${title}`
+    return `Reminder: review due in ${days} days${title}`
   },
   displayName: 'Review reminder (pre-deadline)',
   previewData: {
     title: 'Q4 Marketing Site Refresh',
     platform: 'Storylane',
     teamName: 'Brand Team',
-    daysRemaining: 2,
+    daysRemaining: 1,
     completeBy: '2026-04-20',
     submitterName: 'Jane Doe',
   },
