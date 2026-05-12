@@ -16,6 +16,7 @@ import { template as reviewReminder } from './review-reminder.tsx'
 import { template as passwordReset } from './password-reset.tsx'
 import { template as reviewResubmitted } from './review-resubmitted.tsx'
 import { template as reviewFinalized } from './review-finalized.tsx'
+import { template as reviewAutoAdvanced } from './review-auto-advanced-to-correction.tsx'
 
 export const TEMPLATES: Record<string, TemplateEntry> = {
   'new-review-request': newReviewRequest,
@@ -25,4 +26,5 @@ export const TEMPLATES: Record<string, TemplateEntry> = {
   'password-reset': passwordReset,
   'review-resubmitted': reviewResubmitted,
   'review-finalized': reviewFinalized,
+  'review-auto-advanced-to-correction': reviewAutoAdvanced,
 }
