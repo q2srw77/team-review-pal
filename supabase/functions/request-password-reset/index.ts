@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    const origin = appOrigin && /^https?:\/\//.test(appOrigin) ? appOrigin.replace(/\/$/, '') : 'https://reviewhub.cyphersecurity.us'
+    const envOrigin = Deno.env.get('APP_ORIGIN')
+    const origin = envOrigin && /^https?:\/\//.test(envOrigin) ? envOrigin.replace(/\/$/, '') : 'https://reviewhub.cyphersecurity.us'
     const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(linkToken)}`
 
     // Send via shared transactional email function
