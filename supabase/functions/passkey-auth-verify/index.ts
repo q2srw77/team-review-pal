@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
     const credentialId = String(response?.id || '')
-    console.log('auth-verify start', { rpID, origin, hasResponse: !!response, credentialId })
+    console.log('auth-verify start', { allowedRpIDs, allowedOrigins, hasResponse: !!response, credentialId })
 
     const expectedChallenge = response?.response?.clientDataJSON
       ? JSON.parse(atob(response.response.clientDataJSON.replace(/-/g, '+').replace(/_/g, '/'))).challenge
