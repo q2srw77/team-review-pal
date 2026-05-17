@@ -62,8 +62,8 @@ Deno.serve(async (req) => {
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
+      expectedOrigin: allowedOrigins,
+      expectedRPID: allowedRpIDs,
       credential: {
         id: credentialId,
         publicKey: publicKeyBytes,
