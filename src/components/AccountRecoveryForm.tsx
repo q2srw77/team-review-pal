@@ -20,7 +20,7 @@ export default function AccountRecoveryForm({ onBack, initialEmail = "" }: Props
     setSubmitting(true);
     try {
       await supabase.functions.invoke("request-password-reset", {
-        body: { email: email.trim(), appOrigin: window.location.origin },
+        body: { email: email.trim() },
       });
       setSent(true);
     } catch {
