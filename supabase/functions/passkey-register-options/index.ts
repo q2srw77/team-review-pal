@@ -31,10 +31,9 @@ Deno.serve(async (req) => {
     const userId = userData.user.id
     const email = userData.user.email ?? ''
 
-    const body = await req.json().catch(() => ({}))
-    const rpID = String(body?.rpID || '')
-    const rpName = String(body?.rpName || 'Review Hub')
-    if (!rpID) return json(400, { error: 'rpID required' })
+    // rpID and rpName are server-enforced — never trust client values.
+    const rpID = getRpID()
+    const rpName = RP_NAME
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
