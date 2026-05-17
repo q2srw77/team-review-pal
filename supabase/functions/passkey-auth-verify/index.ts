@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { verifyAuthenticationResponse } from 'npm:@simplewebauthn/server@11'
+import { getAllowedRpIDs, getExpectedOrigins } from '../_shared/webauthn-config.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,14 +18,16 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}))
     const response = body?.response
-    const rpID = String(body?.rpID || '')
-    const origin = String(body?.origin || '')
-    if (!response || !rpID || !origin) return json(400, { error: 'Missing fields' })
+    if (!response) return json(400, { error: 'Missing fields' })
+
+    // rpID/origin are server-enforced.
+    const allowedRpIDs = getAllowedRpIDs()
+    const allowedOrigins = getExpectedOrigins()
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
     const credentialId = String(response?.id || '')
-    console.log('auth-verify start', { rpID, origin, hasResponse: !!response, credentialId })
+    console.log('auth-verify start', { allowedRpIDs, allowedOrigins, hasResponse: !!response, credentialId })
 
     const expectedChallenge = response?.response?.clientDataJSON
       ? JSON.parse(atob(response.response.clientDataJSON.replace(/-/g, '+').replace(/_/g, '/'))).challenge
@@ -59,8 +62,8 @@ Deno.serve(async (req) => {
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
+      expectedOrigin: allowedOrigins,
+      expectedRPID: allowedRpIDs,
       credential: {
         id: credentialId,
         publicKey: publicKeyBytes,

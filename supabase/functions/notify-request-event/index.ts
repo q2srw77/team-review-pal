@@ -46,13 +46,21 @@ Deno.serve(async (req) => {
     }
     const userId = claimsData.claims.sub as string
 
-    let body: { event?: EventName; request_id?: string; app_url?: string }
+    let body: { event?: EventName; request_id?: string }
     try { body = await req.json() } catch {
       return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    const { event, request_id, app_url } = body
+    const { event, request_id } = body
+
+    // Build the link server-side from a trusted env var. Never accept the
+    // app URL from the client — that would let any submitter inject arbitrary
+    // (e.g. phishing) URLs into emails sent via our legitimate domain.
+    const envOrigin = Deno.env.get('APP_ORIGIN')
+    const app_url = envOrigin && /^https?:\/\//.test(envOrigin)
+      ? envOrigin.replace(/\/$/, '')
+      : 'https://reviewhub.cyphersecurity.us'
     if (!event || !request_id) {
       return new Response(JSON.stringify({ error: 'event and request_id are required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -68,7 +68,6 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
         body: {
           event: "request_created",
           request_id: requestId,
-          app_url: window.location.origin,
         },
       });
     } catch (emailErr) {

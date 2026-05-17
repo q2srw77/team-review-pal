@@ -17,12 +17,9 @@ async function readInvokeError(err: any, fallback: string): Promise<string> {
 }
 
 export async function registerPasskey(deviceLabel: string) {
-  const rpID = window.location.hostname;
-  const origin = window.location.origin;
-
   const { data: optsData, error: optsErr } = await supabase.functions.invoke(
     "passkey-register-options",
-    { body: { rpID, rpName: "Review Hub" } }
+    { body: {} }
   );
   if (optsErr) throw new Error(await readInvokeError(optsErr, "Failed to get registration options"));
   if (optsData?.error) throw new Error(optsData.error);
@@ -32,7 +29,7 @@ export async function registerPasskey(deviceLabel: string) {
 
   const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
     "passkey-register-verify",
-    { body: { response: attResp, rpID, origin, deviceLabel } }
+    { body: { response: attResp, deviceLabel } }
   );
   if (verifyErr) throw new Error(await readInvokeError(verifyErr, "Verification failed"));
   if (verifyData?.error) throw new Error(verifyData.error);
@@ -40,12 +37,9 @@ export async function registerPasskey(deviceLabel: string) {
 }
 
 export async function signInWithPasskey(email: string) {
-  const rpID = window.location.hostname;
-  const origin = window.location.origin;
-
   const { data: optsData, error: optsErr } = await supabase.functions.invoke(
     "passkey-auth-options",
-    { body: { email, rpID } }
+    { body: { email } }
   );
   if (optsErr) throw new Error(await readInvokeError(optsErr, "Failed to get authentication options"));
   if (optsData?.error) throw new Error(optsData.error);
@@ -55,7 +49,7 @@ export async function signInWithPasskey(email: string) {
 
   const { data: verifyData, error: verifyErr } = await supabase.functions.invoke(
     "passkey-auth-verify",
-    { body: { response: authResp, rpID, origin } }
+    { body: { response: authResp } }
   );
   if (verifyErr) throw new Error(await readInvokeError(verifyErr, "Sign-in failed"));
   if (verifyData?.error) throw new Error(verifyData.error);
