@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
     }
     const token = authHeader.replace('Bearer ', '')
     const isServiceRole = token === serviceRoleKey
+    let callerUserId: string | null = null
 
     if (!isServiceRole) {
       const anonClient = createClient(supabaseUrl, anonKey, {
@@ -36,6 +37,7 @@ Deno.serve(async (req) => {
           status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
+      callerUserId = (claimsData.claims.sub as string) ?? null
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
@@ -59,6 +61,33 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Request not found' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // Authorization: only submitter, team member, or admin may generate/access the report
+    if (!isServiceRole) {
+      if (!callerUserId) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      let allowed = request.submitted_by === callerUserId
+      if (!allowed) {
+        const { data: adminCheck } = await supabase.rpc('has_role', {
+          _user_id: callerUserId, _role: 'admin',
+        })
+        allowed = !!adminCheck
+      }
+      if (!allowed && request.team_id) {
+        const { data: memberCheck } = await supabase.rpc('is_team_member', {
+          _user_id: callerUserId, _team_id: request.team_id,
+        })
+        allowed = !!memberCheck
+      }
+      if (!allowed) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // Skip if already generated
