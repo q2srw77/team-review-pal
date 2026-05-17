@@ -32,10 +32,13 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}))
     const response = body?.response
-    const rpID = String(body?.rpID || '')
-    const origin = String(body?.origin || '')
     const deviceLabel = String(body?.deviceLabel || 'Passkey').slice(0, 80)
-    if (!response || !rpID || !origin) return json(400, { error: 'Missing fields' })
+    if (!response) return json(400, { error: 'Missing fields' })
+
+    // rpID/origin are server-enforced — never read from client body.
+    const allowedRpIDs = getAllowedRpIDs()
+    const allowedOrigins = getExpectedOrigins()
+    const rpID = allowedRpIDs[0]
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
