@@ -16,9 +16,8 @@ const json = (status: number, body: unknown) =>
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
   try {
-    const body = await req.json().catch(() => ({}))
-    const rpID = String(body?.rpID || '')
-    if (!rpID) return json(400, { error: 'rpID required' })
+    // rpID is server-enforced.
+    const rpID = getRpID()
 
     const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
