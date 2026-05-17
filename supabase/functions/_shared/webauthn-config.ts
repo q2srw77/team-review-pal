@@ -25,9 +25,12 @@ function normalizeOrigin(value: string | undefined | null): string | null {
 
 export function getExpectedOrigins(): string[] {
   const origins = new Set<string>()
-  const env = normalizeOrigin(Deno.env.get('APP_ORIGIN')) ?? FALLBACK_ORIGIN
-  origins.add(env)
-  // Known Lovable hostnames for this project (preview / published).
+  const env = normalizeOrigin(Deno.env.get('APP_ORIGIN'))
+  if (env) origins.add(env)
+  for (const o of DEFAULT_ALLOWED_ORIGINS) {
+    const n = normalizeOrigin(o)
+    if (n) origins.add(n)
+  }
   const extra = Deno.env.get('APP_ORIGIN_ALLOWLIST')
   if (extra) {
     for (const o of extra.split(',')) {
