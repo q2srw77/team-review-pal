@@ -30,7 +30,6 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}))
     const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
-    const appOrigin = typeof body?.appOrigin === 'string' ? body.appOrigin : ''
 
     if (!email || email.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       // Generic response to avoid enumeration
