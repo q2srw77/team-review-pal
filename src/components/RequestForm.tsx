@@ -61,53 +61,16 @@ export default function RequestForm({ onCreated }: { onCreated: () => void }) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    // Send email notifications to team members
+    // Send email notifications to team members via server-side wrapper
+    // (authorization is enforced inside notify-request-event).
     try {
-      const { data: members } = await supabase
-        .from("team_members")
-        .select("user_id")
-        .eq("team_id", teamId);
-
-      if (members && members.length > 0) {
-        const otherMemberIds = members
-          .filter((m) => m.user_id !== user.id)
-          .map((m) => m.user_id);
-
-        if (otherMemberIds.length > 0) {
-          const { data: memberProfiles } = await supabase
-            .from("profiles")
-            .select("user_id, email, full_name")
-            .in("user_id", otherMemberIds);
-
-          const teamName = teams.find((t) => t.id === teamId)?.name || "";
-          const { data: submitterProfile } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("user_id", user.id)
-            .maybeSingle();
-
-          if (memberProfiles) {
-            for (const profile of memberProfiles) {
-              if (!profile.email) continue;
-              supabase.functions.invoke("send-transactional-email", {
-                body: {
-                  templateName: "new-review-request",
-                  recipientEmail: profile.email,
-                  idempotencyKey: `review-notify-${requestId}-${profile.user_id}`,
-                  templateData: {
-                    title: title.trim(),
-                    platform,
-                    teamName,
-                    submitterName: submitterProfile?.full_name || user.email,
-                    completeBy: completeBy ? format(completeBy, "PPP") : undefined,
-                    appUrl: window.location.origin,
-                  },
-                },
-              });
-            }
-          }
-        }
-      }
+      await supabase.functions.invoke("notify-request-event", {
+        body: {
+          event: "request_created",
+          request_id: requestId,
+          app_url: window.location.origin,
+        },
+      });
     } catch (emailErr) {
       console.error("Failed to send notifications:", emailErr);
     }

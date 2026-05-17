@@ -553,38 +553,18 @@ export default function RequestDetail({
       onUpdated();
 
       // When all reviewers complete, the DB trigger lands the request in 'correction'.
-      // Notify the submitter that all reviewers have finished — final PDF is generated
-      // later when the submitter clicks Complete.
+      // Notify the submitter via server-side wrapper that validates the state
+      // and the caller's relationship to the request.
       if (newStatus === "completed") {
-        const { data: allStatuses } = await supabase
-          .from("review_statuses")
-          .select("status")
-          .eq("request_id", request.id);
-
-        const allComplete = allStatuses && allStatuses.length > 0 && allStatuses.every((s) => s.status === "completed");
-
-        if (allComplete) {
-          const [{ data: submitterProfile }, { data: team }] = await Promise.all([
-            supabase.from("profiles").select("email").eq("user_id", request.submitted_by).single(),
-            request.team_id
-              ? supabase.from("teams").select("name").eq("id", request.team_id).single()
-              : Promise.resolve({ data: null }),
-          ]);
-
-          if (submitterProfile?.email) {
-            await supabase.functions.invoke("send-transactional-email", {
-              body: {
-                templateName: "review-all-complete",
-                recipientEmail: submitterProfile.email,
-                idempotencyKey: `review-all-complete-${request.id}`,
-                templateData: {
-                  title: request.title,
-                  platform: request.platform,
-                  teamName: team?.name,
-                },
-              },
-            });
-          }
+        try {
+          await supabase.functions.invoke("notify-request-event", {
+            body: {
+              event: "all_reviews_complete",
+              request_id: request.id,
+            },
+          });
+        } catch (e) {
+          console.error("Failed to send all-complete notification:", e);
         }
       }
     }

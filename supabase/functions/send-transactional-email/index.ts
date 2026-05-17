@@ -54,10 +54,24 @@ Deno.serve(async (req) => {
     const tmpClient = createClient(Deno.env.get('SUPABASE_URL')!, anonKey, {
       global: { headers: { Authorization: authHeader } },
     })
-    const { error: claimsErr } = await tmpClient.auth.getClaims(token)
-    if (claimsErr) {
+    const { data: claimsData, error: claimsErr } = await tmpClient.auth.getClaims(token)
+    if (claimsErr || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    // Restrict direct user invocations to admins to prevent email abuse / spam.
+    const callerUserId = claimsData.claims.sub as string | undefined
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      serviceRoleKey,
+    )
+    const { data: isAdmin } = await adminClient.rpc('has_role', {
+      _user_id: callerUserId, _role: 'admin',
+    })
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
   }
