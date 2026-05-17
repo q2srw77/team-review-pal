@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
       : null
     if (!expectedChallenge) return json(400, { error: 'Bad clientDataJSON' })
 
-    console.log('register-verify start', { userId, rpID, origin, hasResponse: !!response })
+    console.log('register-verify start', { userId, allowedRpIDs, allowedOrigins, hasResponse: !!response })
 
     const { data: ch } = await admin
       .from('passkey_challenges')
@@ -66,8 +66,8 @@ Deno.serve(async (req) => {
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
+      expectedOrigin: allowedOrigins,
+      expectedRPID: allowedRpIDs,
     })
 
     console.log('register-verify webauthn', { verified: verification.verified, hasInfo: !!verification.registrationInfo })
