@@ -5,7 +5,12 @@
 // the APP_ORIGIN env var and allow a small allowlist of additional known
 // origins (Lovable preview/published domains).
 
-const FALLBACK_ORIGIN = 'https://reviewhub.cyphersecurity.us'
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://reviewhub.cyphersecurity.us',
+  'https://team-review-pal.lovable.app',
+  'https://id-preview--12ceecea-7754-4292-80f9-2a5ae25c91d0.lovable.app',
+]
+
 
 function normalizeOrigin(value: string | undefined | null): string | null {
   if (!value) return null
