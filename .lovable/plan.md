@@ -1,78 +1,46 @@
-## Goal
+## Problem
 
-Verify that recent security hardening (server-enforced email link origin, server-enforced WebAuthn rpID/origin, edge function authorization tightening, SECURITY DEFINER privilege revokes) did not break any user-facing flow. No code changes — purely verification, with a short list of follow-ups only if something is actually broken.
+When an admin deletes a user via `manage-user` (action `delete_user`), only `team_members`, `user_roles`, `profiles`, and the auth user are removed. Rows in `review_statuses` for that user (and related rows) are left behind. Because the deleted user's pending `review_status` never moves to `completed`, the request stays in `pending` / `in_review` and only auto-advances when the deadline is reached. In the UI the orphaned reviewer renders as "Unknown".
 
-## Scope of recent changes to re-validate
+## Fix
 
-1. `notify-request-event` — `app_url` removed from request body; appUrl now built from `APP_ORIGIN` env (fallback `https://reviewhub.cyphersecurity.us`).
-2. `RequestForm.tsx` — no longer sends `app_url`.
-3. Passkey edge functions (`passkey-register-options`, `passkey-register-verify`, `passkey-auth-options`, `passkey-auth-verify`) — rpID/origin no longer accepted from client; derived server-side from a built-in allowlist (`reviewhub.cyphersecurity.us`, `team-review-pal.lovable.app`, preview `id-preview--…lovable.app`) plus optional `APP_ORIGIN` / `APP_ORIGIN_ALLOWLIST` env vars.
-4. `src/lib/passkeys.ts` — no longer sends rpID/origin/rpName.
-5. `send-transactional-email` — restricted to service-role / admin callers only.
-6. `generate-review-report` — submitter/team-member/admin authorization enforced after JWT validation.
-7. SECURITY DEFINER privilege revokes from PUBLIC/anon/authenticated (except `has_role`, `is_team_member`).
+Update `supabase/functions/manage-user/index.ts` `delete_user` branch so that, before deleting the auth user, it also cleans up everything tied to the user and unblocks affected review requests.
 
-## Verification plan
+### Steps inside `delete_user`
 
-### A. Static / read-only checks
+1. Collect the set of `request_id`s where the deleted user currently has a `review_statuses` row (these are the requests whose status may need to be recomputed).
+2. Delete the deleted user's rows from:
+   - `review_statuses` (removes the blocking "Unknown" reviewer entirely — cleaner than leaving an orphaned row)
+   - `review_reminders_sent` (by `reviewer_id`)
+   - `request_notes` (by `author_id`) — or, safer, reassign to NULL is not possible since `author_id` is NOT NULL, so delete the notes authored by the removed user (these would otherwise also render as "Unknown")
+   - `user_passkeys`, `user_settings`, `passkey_challenges` (by `user_id`)
+3. For each affected `request_id` collected in step 1, recompute the request status using the same logic as the `auto_update_request_status` trigger:
+   - Count remaining `review_statuses` rows: `total`, `completed`, `in_review`.
+   - Only touch requests whose current status is `pending` or `in_review` (don't override `correction` / `completed`).
+   - If `total > 0 AND completed = total` → set to `correction` (all remaining reviewers done).
+   - Else if `in_review > 0 OR completed > 0` → `in_review`.
+   - Else → `pending`.
+   - If `total = 0` (deleted user was the only reviewer), set to `correction` so the submitter can act, mirroring the auto-close behavior. (Alternative: leave as `pending`; chosen `correction` to avoid stuck requests with no reviewers.)
+4. Continue with existing deletes (`team_members`, `user_roles`, `profiles`) and `auth.admin.deleteUser`.
+5. Write an `audit_logs` entry with the deleted user's id, the count of affected requests, and the request ids, action `deleted_user_cleanup`.
 
-1. Search the repo for any remaining references to `app_url`, `rpID`, `origin` in client → edge function invocations to confirm nothing else still sends them.
-2. Search for direct client calls to `send-transactional-email` — there should be none from the browser; only `notify-request-event`, `request-password-reset`, `resubmit-for-review`, `finalize-review-request`, `auto-close-overdue-requests`, `send-review-reminders` should invoke it (service-role or admin context).
-3. Open `supabase/functions/_shared/webauthn-config.ts` and confirm the three default allowed origins cover the preview, published, and custom-domain hosts the project actually uses (cross-check `project_urls`).
-4. Confirm `send-review-reminders`, `finalize-review-request`, `resubmit-for-review`, `auto-close-overdue-requests`, and any other server-side caller of `send-transactional-email` use the service-role key (since the function is now admin/service-role only).
-5. Re-read `generate-review-report` to confirm the authorization branch still allows: submitter, team member, and admin — and rejects everyone else with 403.
+### Step 3 implementation note
 
-### B. Edge function smoke tests (via `supabase--curl_edge_functions`)
+Do the recompute server-side with the service-role client (loops over affected requests with one small `select` + one `update` each). No SQL function is added; keeping it in TypeScript matches the rest of `manage-user`. If you prefer a single DB round-trip, we can add a `public.recompute_request_status(uuid)` SECURITY DEFINER function in a follow-up — not required for the fix.
 
-For each, observe status + body; do not require a UI interaction.
+### What is NOT changed
 
-1. `notify-request-event` with no auth → 401.
-2. `notify-request-event` as a non-related authenticated user for someone else's request → 403.
-3. `notify-request-event` as the submitter with `event: "request_created"` for a real request → 200, `sent >= 0`. (Use an existing test request, do not create one.)
-4. `send-transactional-email` called as a regular authenticated user → should be 403.
-5. `generate-review-report` as a non-related authenticated user → 403; as the submitter → 200.
-6. `passkey-auth-options` with no body → 200 with `options.challenge` present (no longer requires `rpID`).
-7. `passkey-register-options` without auth → 401; with auth but no body → 200 with `options.challenge`.
+- `auto_update_request_status` trigger and other DB logic stay as-is.
+- `review_statuses` table schema stays as-is (no FK to auth.users, so no cascade option without a migration; explicit cleanup in the edge function is sufficient).
+- UI "Unknown" fallback stays as a defensive label for any genuinely missing profile.
+- Submitters who are deleted: `review_requests.submitted_by` rows will be left intact (admin can decide whether to delete). Out of scope for this fix unless you want it included — let me know.
 
-### C. End-to-end UI flows in the preview
+## Files touched
 
-Run through these in the browser preview to confirm no regression:
+- `supabase/functions/manage-user/index.ts` — extend `delete_user` branch (steps 1–5 above).
 
-1. **Login (password)** — sign in as an existing admin and a non-admin.
-2. **Dashboard load** — admin sees all, non-admin sees team-scoped requests.
-3. **Create review request** — submit a new request and confirm:
-   - row appears in the DB
-   - team members receive the "new review request" email (check `email_send_log`)
-   - the email button URL points to `https://reviewhub.cyphersecurity.us` (server-built), NOT the preview host
-4. **Review flow** — a reviewer marks a request as completed; when all complete, status flips to `correction` and the submitter receives the "all complete" email.
-5. **Corrections / resubmit** — submitter resubmits; new deadline applied; reviewers re-notified.
-6. **Generate PDF report** — submitter and admin can generate; an unrelated non-admin user cannot.
-7. **Password reset** — request a reset, confirm the email link uses `reviewhub.cyphersecurity.us`.
-8. **Passkey register** — register a passkey from Profile → Passkeys on the preview origin. Confirm it succeeds (preview origin is in the server allowlist).
-9. **Passkey sign-in** — sign out, then sign in with the registered passkey on the preview origin.
-10. **Passkey on published domain** — repeat register + sign-in on `team-review-pal.lovable.app` and on `reviewhub.cyphersecurity.us` to confirm all three origins still work after the allowlist change. (If the user has not deployed yet, this can be deferred.)
+## Verification
 
-### D. Logs / observability checks
-
-1. `email_send_log` — confirm recent transactional sends have `status = sent` (or at minimum `pending`); no spike in `failed` since the changes.
-2. Edge function logs for `notify-request-event`, `send-transactional-email`, `passkey-*` — scan for 4xx/5xx spikes.
-3. Postgres logs — scan for permission-denied errors that would indicate the privilege revokes broke a path.
-
-### E. Reporting
-
-Produce a single results summary with:
-- ✅ flows that work as expected
-- ⚠️ anything that needs follow-up, with a concrete fix proposal
-- 🔁 anything that could not be tested (e.g. requires the user to be logged in as a specific role) with instructions for the user
-
-## Out of scope
-
-- New security work or new findings (this is a regression check only).
-- UI refactors or design changes.
-- Re-running security scans (already done in the previous turn).
-
-## Risks worth specifically watching
-
-- **Passkey registration/auth failing on the preview origin** if the hardcoded allowlist in `webauthn-config.ts` doesn't match the current preview host. The preview hostname for this project is `id-preview--12ceecea-7754-4292-80f9-2a5ae25c91d0.lovable.app` and is in the allowlist, but if Lovable ever rotates the preview ID, this would silently break preview passkeys.
-- **Email button URLs pointing to the fallback domain** even when users test from preview — this is correct behavior post-fix (no client-controlled origin), but worth flagging so it isn't mistaken for a bug.
-- **`send-transactional-email` 403s** if any server caller forgot the service-role key.
+- Delete a user who has a pending review on an active request → request status updates immediately; reviewer no longer appears as "Unknown"; if all other reviewers were already completed, request flips to `correction`.
+- Delete a user with no review assignments → unchanged behavior.
+- Re-deploy `manage-user`.
