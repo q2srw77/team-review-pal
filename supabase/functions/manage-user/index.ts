@@ -152,9 +152,84 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+
+      // 1. Collect requests where this user is currently a reviewer — these
+      //    may need their status recomputed once their review_status row is gone.
+      const { data: reviewerRows } = await supabase
+        .from("review_statuses")
+        .select("request_id")
+        .eq("reviewer_id", user_id);
+      const affectedRequestIds = Array.from(
+        new Set((reviewerRows ?? []).map((r) => r.request_id as string)),
+      );
+
+      // 2. Remove all rows tied to the deleted user that would otherwise block
+      //    review progress or render as "Unknown".
+      await Promise.all([
+        supabase.from("review_statuses").delete().eq("reviewer_id", user_id),
+        supabase.from("review_reminders_sent").delete().eq("reviewer_id", user_id),
+        supabase.from("request_notes").delete().eq("author_id", user_id),
+        supabase.from("user_passkeys").delete().eq("user_id", user_id),
+        supabase.from("user_settings").delete().eq("user_id", user_id),
+        supabase.from("passkey_challenges").delete().eq("user_id", user_id),
+      ]);
+
+      // 3. Recompute status for each affected request (mirrors
+      //    auto_update_request_status trigger; runs in TS because the trigger
+      //    only fires on review_statuses insert/update, not delete).
+      for (const requestId of affectedRequestIds) {
+        const { data: req } = await supabase
+          .from("review_requests")
+          .select("status")
+          .eq("id", requestId)
+          .single();
+        if (!req || (req.status !== "pending" && req.status !== "in_review")) continue;
+
+        const { data: statuses } = await supabase
+          .from("review_statuses")
+          .select("status")
+          .eq("request_id", requestId);
+        const total = statuses?.length ?? 0;
+        const completed = (statuses ?? []).filter((s) => s.status === "completed").length;
+        const inReview = (statuses ?? []).filter((s) => s.status === "in_review").length;
+
+        let newStatus: "pending" | "in_review" | "correction";
+        if (total === 0) {
+          // No remaining reviewers — unblock by moving to correction so the
+          // submitter can act, matching the auto-close-overdue behavior.
+          newStatus = "correction";
+        } else if (completed === total) {
+          newStatus = "correction";
+        } else if (inReview > 0 || completed > 0) {
+          newStatus = "in_review";
+        } else {
+          newStatus = "pending";
+        }
+
+        await supabase
+          .from("review_requests")
+          .update({ status: newStatus })
+          .eq("id", requestId);
+      }
+
+      // 4. Existing cleanup + delete the auth user.
       await supabase.from("team_members").delete().eq("user_id", user_id);
       await supabase.from("user_roles").delete().eq("user_id", user_id);
       await supabase.from("profiles").delete().eq("user_id", user_id);
+
+      // 5. Audit log.
+      await supabase.from("audit_logs").insert({
+        user_id: caller.id,
+        user_name: caller.email ?? "Admin",
+        action: "deleted_user_cleanup",
+        entity_type: "user",
+        entity_id: user_id,
+        details: {
+          affected_request_count: affectedRequestIds.length,
+          affected_request_ids: affectedRequestIds,
+        },
+      });
+
       const { error } = await supabase.auth.admin.deleteUser(user_id);
       if (error) {
         return new Response(JSON.stringify({ error: error.message }), {
