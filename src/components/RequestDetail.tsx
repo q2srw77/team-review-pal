@@ -479,6 +479,35 @@ export default function RequestDetail({
     } else {
       setNewNote("");
       setNewNotePosition("");
+
+      // Auto-promote this reviewer to "in_review" on first note.
+      // The auto_update_request_status trigger then promotes the request itself.
+      const myStatus = reviewerStatuses.find((rs) => rs.reviewer_id === user.id);
+      if (
+        myStatus &&
+        myStatus.status === "pending" &&
+        request.status !== "completed" &&
+        request.status !== "correction"
+      ) {
+        const { error: rsError } = await supabase
+          .from("review_statuses")
+          .update({ status: "in_review", updated_at: new Date().toISOString() })
+          .eq("request_id", request.id)
+          .eq("reviewer_id", user.id);
+        if (!rsError) {
+          supabase.functions.invoke("write-audit-log", {
+            body: {
+              action: "review_status_changed",
+              entity_type: "review_request",
+              entity_id: request.id,
+              details: { new_status: "in_review", title: request.title, auto: "first_note" },
+            },
+          }).catch(() => {});
+          fetchReviewerStatuses();
+          onUpdated();
+        }
+      }
+
       fetchNotes();
     }
   };
