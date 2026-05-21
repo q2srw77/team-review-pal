@@ -481,20 +481,36 @@ export default function RequestDetail({
       setNewNotePosition("");
 
       // Auto-promote this reviewer to "in_review" on first note.
-      // The auto_update_request_status trigger then promotes the request itself.
-      const myStatus = reviewerStatuses.find((rs) => rs.reviewer_id === user.id);
-      if (
-        myStatus &&
-        myStatus.status === "pending" &&
-        request.status !== "completed" &&
-        request.status !== "correction"
-      ) {
-        const { error: rsError } = await supabase
-          .from("review_statuses")
-          .update({ status: "in_review", updated_at: new Date().toISOString() })
-          .eq("request_id", request.id)
-          .eq("reviewer_id", user.id);
-        if (!rsError) {
+      // Works for both regular reviewers (UPDATE existing row) and admins
+      // who may not have a row yet (INSERT a new one).
+      const canAutoPromote =
+        request.status !== "completed" && request.status !== "correction";
+      if (canAutoPromote) {
+        const myStatus = reviewerStatuses.find((rs) => rs.reviewer_id === user.id);
+        let promoted = false;
+        let promoteError: { message: string } | null = null;
+
+        if (myStatus && myStatus.status === "pending") {
+          const { error: rsError } = await supabase
+            .from("review_statuses")
+            .update({ status: "in_review", updated_at: new Date().toISOString() })
+            .eq("request_id", request.id)
+            .eq("reviewer_id", user.id);
+          if (rsError) promoteError = rsError;
+          else promoted = true;
+        } else if (!myStatus && isAdmin && request.submitted_by !== user.id) {
+          const { error: rsError } = await supabase
+            .from("review_statuses")
+            .insert({
+              request_id: request.id,
+              reviewer_id: user.id,
+              status: "in_review",
+            });
+          if (rsError) promoteError = rsError;
+          else promoted = true;
+        }
+
+        if (promoted) {
           supabase.functions.invoke("write-audit-log", {
             body: {
               action: "review_status_changed",
@@ -505,8 +521,15 @@ export default function RequestDetail({
           }).catch(() => {});
           fetchReviewerStatuses();
           onUpdated();
+        } else if (promoteError) {
+          toast({
+            title: "Couldn't auto-update review status",
+            description: promoteError.message,
+            variant: "destructive",
+          });
         }
       }
+
 
       fetchNotes();
     }
