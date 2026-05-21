@@ -1,32 +1,51 @@
 ## Goal
 
-When a reviewer posts their first note on a request, automatically flip their reviewer status from `pending` to `in_review`. This causes the existing `auto_update_request_status` trigger to promote the request itself to **In Review**, so no separate request-level update is needed.
+When an **admin** posts the first comment on a request, their reviewer card should flip from Pending → In Review automatically, exactly like a regular reviewer. Today this silently no-ops for admins in two cases:
 
-## Scope
+1. The admin has no row in `review_statuses` for the request (admins aren't added by the `auto_populate_review_statuses` trigger, which only inserts `team_members`).
+2. Even if a row exists, the `review_statuses` UPDATE RLS policy requires `has_role('reviewer')`. Admins without the reviewer role are blocked, and we don't surface the error.
 
-Frontend-only change in `src/components/RequestDetail.tsx`. No DB schema, RLS, or edge function changes — the existing reviewer-status UPDATE policy and the existing status trigger already cover this path.
+## Changes
 
-## Change
+### 1. RLS — allow admins to manage their own review status
 
-In `addNote` (around line 458), after the `request_notes` insert succeeds and before `fetchNotes()`:
+Migration on `public.review_statuses`:
 
-1. Find the current user's row in the already-loaded `reviewerStatuses` state.
-2. If it exists and its `status === "pending"`, call the same update used by `updateMyReviewStatus`:
-   - `UPDATE review_statuses SET status='in_review', updated_at=now() WHERE request_id=? AND reviewer_id=?`
-   - Fire the `write-audit-log` invocation with `action: "review_status_changed"`, `new_status: "in_review"` (mirroring the existing manual-change path so audit history stays consistent).
-3. Call `fetchReviewerStatuses()` and `onUpdated()` so the badge, reviewer list, and parent dashboard reflect the new status immediately.
+- **UPDATE policy** — replace `Reviewers can update own review status` with one that accepts either role:
+  ```
+  (auth.uid() = reviewer_id) AND (has_role(auth.uid(),'reviewer') OR has_role(auth.uid(),'admin'))
+  ```
+- **INSERT policy** — add `Admins can self-insert review status`:
+  ```
+  WITH CHECK: auth.uid() = reviewer_id
+              AND has_role(auth.uid(),'admin')
+              AND NOT EXISTS (SELECT 1 FROM review_requests rr
+                              WHERE rr.id = request_id AND rr.submitted_by = auth.uid())
+  ```
+  (Submitter-exclusion rule preserved — admins can't review their own requests.)
+- **DELETE policy** — unchanged; admins already covered by the existing policy.
 
-If the reviewer's status is already `in_review` or `completed`, do nothing extra — only the first note triggers the transition.
+### 2. Frontend — `addNote` in `src/components/RequestDetail.tsx`
 
-## Guardrails preserved
+Around line 483, after a successful note insert:
 
-- The existing early-return in `updateMyReviewStatus` for `completed`/`correction` requests is mirrored: skip the auto-promote when `request.status` is `completed` or `correction` (in those states notes are blocked anyway by `prevent_note_edit_when_completed`, but the guard keeps the code defensive).
-- Admins who are not reviewers on a request won't have a `review_statuses` row, so the lookup safely no-ops.
-- No change to submitter behavior — submitters can't add notes (RLS already enforces `has_role('reviewer')`).
+- If the current user **has** a `review_statuses` row and its status is `pending` → UPDATE to `in_review` (current behavior, unchanged).
+- If the current user has **no** row and is an admin and is **not** the submitter and request status is `pending`/`in_review` → INSERT a new row with `status = 'in_review'`, `reviewer_id = user.id`.
+- Either path: fire the existing `write-audit-log` call with `auto: "first_note"`, then `fetchReviewerStatuses()` + `onUpdated()`.
+- Surface a toast on RLS error (currently swallowed) so future mismatches are visible.
+
+The `auto_update_request_status` trigger then promotes the request itself, so no extra request-level write is needed.
+
+## Guardrails
+
+- Submitters still can't self-review (enforced in both new INSERT RLS and the frontend guard).
+- `completed` / `correction` requests still skip the promote (already-locked notes path).
+- Regular reviewer behavior is unchanged — the UPDATE policy just broadens to also accept admins.
 
 ## Verification
 
-1. As a reviewer with `pending` status, add a note on a `pending` request → reviewer badge flips to In Review, request status flips to In Review, audit log gains a `review_status_changed` entry.
-2. Add a second note from the same reviewer → no extra status update or audit entry.
-3. As a reviewer already `in_review`, adding a note leaves status unchanged.
-4. As a reviewer already `completed`, status stays `completed` (note insert itself is blocked once the request is in `correction`/`completed`).
+1. As an **admin who has no `review_statuses` row** on a `pending` request, post the first note → a new `in_review` row appears for that admin, the request flips to In Review, and an audit log entry is written.
+2. As an **admin who already has a `pending` row** (admin is also a team member), post the first note → row updates to `in_review`; no duplicate insert.
+3. As a regular **reviewer**, behavior is identical to today.
+4. As a **submitter** (admin or not), no row is inserted and no auto-promote happens.
+5. Manual status changes via the badge dropdown still work for admins.
