@@ -1,51 +1,54 @@
 ## Goal
 
-When an **admin** posts the first comment on a request, their reviewer card should flip from Pending → In Review automatically, exactly like a regular reviewer. Today this silently no-ops for admins in two cases:
-
-1. The admin has no row in `review_statuses` for the request (admins aren't added by the `auto_populate_review_statuses` trigger, which only inserts `team_members`).
-2. Even if a row exists, the `review_statuses` UPDATE RLS policy requires `has_role('reviewer')`. Admins without the reviewer role are blocked, and we don't surface the error.
+Prevent users whose only role is **submitter** from being auto-assigned as reviewers on new review requests. Today, `auto_populate_review_statuses` inserts a `review_statuses` row for every team member (except the submitter), regardless of their role — so a submitter-only teammate ends up on the reviewer list and blocks the request from ever reaching "completed".
 
 ## Changes
 
-### 1. RLS — allow admins to manage their own review status
+### 1. Update `auto_populate_review_statuses` trigger function
 
-Migration on `public.review_statuses`:
+Filter team members by role. Only insert a `review_statuses` row for users who have `reviewer` or `admin` (admins implicitly have reviewer rights, per project rules).
 
-- **UPDATE policy** — replace `Reviewers can update own review status` with one that accepts either role:
-  ```
-  (auth.uid() = reviewer_id) AND (has_role(auth.uid(),'reviewer') OR has_role(auth.uid(),'admin'))
-  ```
-- **INSERT policy** — add `Admins can self-insert review status`:
-  ```
-  WITH CHECK: auth.uid() = reviewer_id
-              AND has_role(auth.uid(),'admin')
-              AND NOT EXISTS (SELECT 1 FROM review_requests rr
-                              WHERE rr.id = request_id AND rr.submitted_by = auth.uid())
-  ```
-  (Submitter-exclusion rule preserved — admins can't review their own requests.)
-- **DELETE policy** — unchanged; admins already covered by the existing policy.
+```sql
+INSERT INTO public.review_statuses (request_id, reviewer_id)
+SELECT NEW.id, tm.user_id
+FROM public.team_members tm
+WHERE tm.team_id = NEW.team_id
+  AND tm.user_id != NEW.submitted_by
+  AND (
+    public.has_role(tm.user_id, 'reviewer'::app_role)
+    OR public.has_role(tm.user_id, 'admin'::app_role)
+  );
+```
 
-### 2. Frontend — `addNote` in `src/components/RequestDetail.tsx`
+Everything else about the function (SECURITY DEFINER, `search_path = public`) stays the same.
 
-Around line 483, after a successful note insert:
+### 2. Backfill: remove existing stale submitter-only rows
 
-- If the current user **has** a `review_statuses` row and its status is `pending` → UPDATE to `in_review` (current behavior, unchanged).
-- If the current user has **no** row and is an admin and is **not** the submitter and request status is `pending`/`in_review` → INSERT a new row with `status = 'in_review'`, `reviewer_id = user.id`.
-- Either path: fire the existing `write-audit-log` call with `auto: "first_note"`, then `fetchReviewerStatuses()` + `onUpdated()`.
-- Surface a toast on RLS error (currently swallowed) so future mismatches are visible.
+One-off cleanup so currently-open requests stop waiting on submitter-only users:
 
-The `auto_update_request_status` trigger then promotes the request itself, so no extra request-level write is needed.
+```sql
+DELETE FROM public.review_statuses rs
+WHERE NOT public.has_role(rs.reviewer_id, 'reviewer'::app_role)
+  AND NOT public.has_role(rs.reviewer_id, 'admin'::app_role);
+```
+
+The existing `auto_update_request_status` trigger fires on `review_statuses` changes, so after the delete, any request whose remaining reviewers are all complete will correctly flip to `correction`/`completed`.
+
+### 3. No frontend changes needed
+
+- The reviewer card list in `RequestDetail.tsx` is driven by `review_statuses`, so it updates automatically.
+- The admin self-insert path (added previously for first-note auto-promote) already requires `has_role('admin')`, so it's unaffected.
+- Manual flows (`updateMyReviewStatus`, note authoring) are gated by `reviewer`/`admin` RLS and remain correct.
 
 ## Guardrails
 
-- Submitters still can't self-review (enforced in both new INSERT RLS and the frontend guard).
-- `completed` / `correction` requests still skip the promote (already-locked notes path).
-- Regular reviewer behavior is unchanged — the UPDATE policy just broadens to also accept admins.
+- Submitter-only users are excluded at request creation time and cleaned up retroactively.
+- If a user is later granted the `reviewer` role, they are **not** retroactively added to existing requests — only future requests will include them. This matches today's behavior for role changes and avoids surprise assignments. (Call out if you'd like a different policy.)
+- Admins are still included (they have implicit reviewer rights).
+- The submitter is still excluded from their own request.
 
 ## Verification
 
-1. As an **admin who has no `review_statuses` row** on a `pending` request, post the first note → a new `in_review` row appears for that admin, the request flips to In Review, and an audit log entry is written.
-2. As an **admin who already has a `pending` row** (admin is also a team member), post the first note → row updates to `in_review`; no duplicate insert.
-3. As a regular **reviewer**, behavior is identical to today.
-4. As a **submitter** (admin or not), no row is inserted and no auto-promote happens.
-5. Manual status changes via the badge dropdown still work for admins.
+1. Create a team containing one admin, one reviewer, and one submitter-only user. Have the admin submit a request → only the reviewer (and no row for the submitter-only user) appears in `review_statuses`.
+2. Existing open request that was stuck because a submitter-only teammate was "pending" → after migration, that row is gone and the request advances based on the remaining reviewers.
+3. Regular reviewer + admin flows (notes, status changes, completion) unchanged.
